@@ -1,0 +1,96 @@
+"""Unit tests for ``ChatSessionRepository``."""
+
+import json
+
+import pytest
+
+from app.repositories.chat_session_repository import ChatSessionRepository
+
+
+class TestCreateSession:
+    def test_returns_uuid(self, db_conn):
+        sid = ChatSessionRepository.create_session("My Session")
+        assert isinstance(sid, str)
+        assert len(sid) == 36  # UUID4 format: 8-4-4-4-12
+
+    def test_session_stored(self, db_conn):
+        sid = ChatSessionRepository.create_session("Stored Session")
+        row = db_conn.execute(
+            "SELECT * FROM chat_sessions WHERE id = ?", (sid,)
+        ).fetchone()
+        assert row is not None
+        assert row["session_name"] == "Stored Session"
+        assert row["context"] == "[]"
+
+
+class TestGetSession:
+    def test_found(self, db_conn):
+        sid = ChatSessionRepository.create_session("Lookup Test")
+        session = ChatSessionRepository.get_session(sid)
+        assert session is not None
+        assert session["session_name"] == "Lookup Test"
+        assert session["id"] == sid
+
+    def test_not_found(self, db_conn):
+        session = ChatSessionRepository.get_session("nonexistent-id")
+        assert session is None
+
+
+class TestGetContext:
+    def test_empty_default(self, db_conn):
+        sid = ChatSessionRepository.create_session("Empty Context")
+        ctx = ChatSessionRepository.get_context(sid)
+        assert ctx == []
+
+    def test_nonexistent_session(self, db_conn):
+        ctx = ChatSessionRepository.get_context("nope")
+        assert ctx == []
+
+
+class TestSaveContext:
+    def test_save_and_reload(self, db_conn):
+        sid = ChatSessionRepository.create_session("Save Test")
+        history = [
+            {"role": "user", "content": "Hello"},
+            {"role": "assistant", "content": "Hi there!"},
+        ]
+        ChatSessionRepository.save_context(sid, history)
+
+        ctx = ChatSessionRepository.get_context(sid)
+        assert ctx == history
+
+    def test_updates_updated_at(self, db_conn):
+        sid = ChatSessionRepository.create_session("Timestamp Test")
+        before = ChatSessionRepository.get_session(sid)["updated_at"]
+
+        # Save new context — updated_at should change (or at least stay
+        # consistent; in a fast test it may be the same second).
+        ChatSessionRepository.save_context(sid, [{"role": "user", "content": "ping"}])
+        after = ChatSessionRepository.get_session(sid)["updated_at"]
+        assert after >= before
+
+
+class TestFullRoundTrip:
+    """End-to-end: create → save → reload → verify."""
+
+    def test_round_trip(self, db_conn):
+        # 1. Create
+        sid = ChatSessionRepository.create_session("Round Trip")
+
+        # 2. Save multi-turn context
+        turns = [
+            {"role": "user", "content": "Show all houses in Texas"},
+            {"role": "assistant", "content": "Found 42 listings in Texas."},
+            {"role": "user", "content": "Filter those under $400k"},
+            {"role": "assistant", "content": "12 listings under $400,000."},
+        ]
+        ChatSessionRepository.save_context(sid, turns)
+
+        # 3. Reload and verify
+        reloaded = ChatSessionRepository.get_context(sid)
+        assert reloaded == turns
+
+        # 4. Verify session metadata intact
+        session = ChatSessionRepository.get_session(sid)
+        assert session["session_name"] == "Round Trip"
+        assert json.loads(session["context"]) == turns

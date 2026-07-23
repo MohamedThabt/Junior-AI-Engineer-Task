@@ -19,3 +19,6 @@ Thumbs.db
 logs/
 *.log
 
+# SQLite database
+db/app.db
+

@@ -11,6 +11,7 @@ from config.limiter import limiter
 from config.logger import setup_logging
 from config.middleware import RequestLoggingMiddleware
 from config.settings import settings
+from db.database import init_db
 from routes.api import router as api_router
 from ui import build_ui
 
@@ -19,7 +20,8 @@ setup_logging()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup logic placeholder
+    # Ensure SQLite schema is up-to-date on every startup.
+    init_db()
     yield
     # Shutdown logic placeholder
 

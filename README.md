@@ -53,7 +53,15 @@ LLM_PROVIDER=groq
 GROQ_API_KEY=your_free_groq_api_key_here
 ```
 
-### 5. Run the Application
+### 5. Initialize & Seed SQLite Database
+
+Run the seeder script to apply database migrations and populate SQLite tables from the Excel files:
+
+```bash
+python -m db.seed_database
+```
+
+### 6. Run the Application
 
 Launch the FastAPI backend along with the integrated Gradio Web UI:
 
@@ -95,13 +103,18 @@ Try asking the assistant queries like:
 ├── app/
 │   ├── controllers/      # REST API route handlers
 │   ├── services/         # ReAct Agent loop, LLM adapter & business logic
-│   ├── repositories/     # Data access layer for Excel files (Pandas/openpyxl)
+│   ├── repositories/     # SQLite Data access layer (Real Estate, Marketing, Chat Session)
 │   ├── models/           # Data schemas & validation models (Pydantic DTOs)
-│   └── utilities/        # Timestamped backup manager & query filter evaluators
+│   └── utilities/        # Query filter evaluators & response formatting
 ├── config/               # Logging, limiter & environment settings
-├── data/                 # Data directory containing Excel sheets
+├── data/                 # Data directory containing Excel source files
 │   ├── Real Estate Listings.xlsx
 │   └── Marketing Campaigns.xlsx
+├── db/                   # Database layer (SQLite migrations, connection factory & seeder)
+│   ├── app.db            # Generated SQLite database file
+│   ├── database.py       # Connection factory and migration runner
+│   ├── seed_database.py  # Seeder script parsing Excel files into SQLite
+│   └── migrations/       # SQL migration scripts
 ├── docs/                 # Full documentation
 │   ├── PRD.md            # Product Requirements Document & Mermaid Workflows
 │   └── TECHNICAL_SPEC.md # Architecture & ReAct Sequence Diagrams
