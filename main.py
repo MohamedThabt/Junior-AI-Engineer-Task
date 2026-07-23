@@ -1,5 +1,6 @@
 from contextlib import asynccontextmanager
 
+import gradio as gr
 from fastapi import FastAPI
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -11,6 +12,7 @@ from config.logger import setup_logging
 from config.middleware import RequestLoggingMiddleware
 from config.settings import settings
 from routes.api import router as api_router
+from ui import build_ui
 
 setup_logging()
 
@@ -44,3 +46,8 @@ app.include_router(api_router, prefix="/api")
 @app.get("/")
 def read_root():
     return {"message": "API is running"}
+
+
+# Mount the Gradio UI so it launches together with the FastAPI server.
+# Available at /ui once the server is running.
+app = gr.mount_gradio_app(app, build_ui(), path="/ui")

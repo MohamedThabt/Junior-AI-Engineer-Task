@@ -2,6 +2,10 @@
 fastapi[standard]==0.139.2
 uvicorn[standard]==0.51.0
 
+# UI
+gradio==6.20.0
+
+
 # Data Validation & Settings
 pydantic==2.13.4
 pydantic-settings==2.14.2
