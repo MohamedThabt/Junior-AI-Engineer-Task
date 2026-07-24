@@ -16,6 +16,11 @@ class Settings(BaseSettings):
     # the loop controller's budget can change without a code change.
     max_steps: int = Field(default=5, alias="MAX_STEPS")
 
+    # Per-call SQLite busy-timeout (seconds) used by the repository layer so
+    # a hung/locked DB call fails fast instead of blocking the tool retry
+    # loop indefinitely.
+    tool_timeout_seconds: float = Field(default=5.0, alias="TOOL_TIMEOUT_SECONDS")
+
     # LLM provider selection: LLM_PROVIDER/LLM_MODEL are generic so the same
     # settings shape works for any provider; the API key is provider-specific
     # so multiple providers can be configured side by side.

@@ -15,7 +15,9 @@ DB_PATH = _DB_DIR / "app.db"
 _MIGRATIONS_DIR = _DB_DIR / "migrations"
 
 
-def get_connection(db_path: str | Path | None = None) -> sqlite3.Connection:
+def get_connection(
+    db_path: str | Path | None = None, timeout: float | None = None
+) -> sqlite3.Connection:
     """Open (or create) the SQLite database and return a connection.
 
     Parameters
@@ -23,9 +25,16 @@ def get_connection(db_path: str | Path | None = None) -> sqlite3.Connection:
     db_path:
         Override the default path (useful for tests that pass ``:memory:``
         or a temp file).  When *None*, ``db/app.db`` is used.
+    timeout:
+        SQLite's own busy-timeout (seconds): how long a call will wait on
+        lock contention before raising ``sqlite3.OperationalError``, rather
+        than blocking indefinitely. Callers that need a bounded per-call
+        timeout (e.g. the tool layer) pass this explicitly; ``None`` falls
+        back to sqlite3's own default (5s).
     """
     path = str(db_path) if db_path is not None else str(DB_PATH)
-    conn = sqlite3.connect(path)
+    kwargs = {} if timeout is None else {"timeout": timeout}
+    conn = sqlite3.connect(path, **kwargs)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
