@@ -104,11 +104,13 @@ class CampaignRepository:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def update(campaign_id: str, fields: dict) -> dict:
+    def update(campaign_id: str, fields: dict) -> dict | None:
         """Update *fields* on the campaign identified by *campaign_id* and
         return the updated row."""
         conn = get_connection(timeout=settings.tool_timeout_seconds)
         try:
+            if not fields:
+                return CampaignRepository._fetch_by_id(conn, campaign_id)
             set_clause = ", ".join(f"{col} = ?" for col in fields)
             values = list(fields.values()) + [campaign_id]
             try:

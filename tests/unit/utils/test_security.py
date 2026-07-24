@@ -1,9 +1,4 @@
-"""Tests for `app/utilities/security.py` — regex-based PII/secret scanning.
-
-Arrange-Act-Assert throughout. Positive cases per pattern type, a clean-text
-negative case, and an explicit assertion that the matched secret value never
-appears in the return value (the return value is always a fixed type label).
-"""
+"""Tests for `app/utilities/security.py` — regex-based PII/secret scanning."""
 
 from app.utilities.security import scan_for_sensitive_data
 

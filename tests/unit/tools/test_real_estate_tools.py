@@ -10,37 +10,13 @@ from app.tools.real_estate_tools import (
     query_real_estate,
     update_real_estate,
 )
-
-_SAMPLE_LISTING = {
-    "listing_id": "LST-9001",
-    "property_type": "House",
-    "city": "Austin",
-    "state": "Texas",
-    "bedrooms": 4,
-    "bathrooms": 2.5,
-    "square_footage": 2200,
-    "year_built": 2005,
-    "list_price": 450000.0,
-    "sale_price": None,
-    "listing_status": "Active",
-}
-
-
-def _insert_sample(db_conn, overrides: dict | None = None):
-    data = {**_SAMPLE_LISTING, **(overrides or {})}
-    cols = ", ".join(data.keys())
-    placeholders = ", ".join("?" for _ in data)
-    db_conn.execute(
-        f"INSERT INTO real_estate_listings ({cols}) VALUES ({placeholders})",
-        list(data.values()),
-    )
-    db_conn.commit()
+from tests.conftest import SAMPLE_LISTING, insert_sample_listing
 
 
 class TestQueryRealEstate:
     def test_returns_matching_rows(self, db_conn):
-        _insert_sample(db_conn)
-        _insert_sample(db_conn, {"listing_id": "LST-9002", "city": "Dallas"})
+        insert_sample_listing(db_conn)
+        insert_sample_listing(db_conn, {"listing_id": "LST-9002", "city": "Dallas"})
         result = query_real_estate({"city": "Austin"})
         assert result.success is True
         assert result.data["count"] == 1
@@ -60,7 +36,7 @@ class TestQueryRealEstate:
 
     def test_caps_limit_at_50_regardless_of_requested_value(self, db_conn):
         for i in range(55):
-            _insert_sample(db_conn, {"listing_id": f"LST-9{i:03d}"})
+            insert_sample_listing(db_conn, {"listing_id": f"LST-9{i:03d}"})
         result = query_real_estate({"limit": 1000})
         assert result.success is True
         assert result.data["count"] == MAX_QUERY_LIMIT
@@ -78,14 +54,14 @@ class TestQueryRealEstate:
 
 class TestInsertRealEstate:
     def test_insert_success(self, db_conn):
-        result = insert_real_estate({**_SAMPLE_LISTING})
+        result = insert_real_estate({**SAMPLE_LISTING})
         assert result.success is True
         assert result.data["listing_id"] == "LST-9001"
         assert result.attempts == 1
 
     def test_insert_duplicate_id_fails_naming_the_tool(self, db_conn):
-        _insert_sample(db_conn)
-        result = insert_real_estate({**_SAMPLE_LISTING})
+        insert_sample_listing(db_conn)
+        result = insert_real_estate({**SAMPLE_LISTING})
         assert result.success is False
         assert "insert_real_estate" in result.error
         assert "LST-9001" in result.error
@@ -105,10 +81,10 @@ class TestInsertRealEstate:
         monkeypatch.setattr(
             "app.tools.real_estate_tools.RealEstateRepository.exists", MagicMock(return_value=False)
         )
-        mock_insert = MagicMock(side_effect=[Exception("database is locked"), {**_SAMPLE_LISTING}])
+        mock_insert = MagicMock(side_effect=[Exception("database is locked"), {**SAMPLE_LISTING}])
         monkeypatch.setattr("app.tools.real_estate_tools.RealEstateRepository.insert", mock_insert)
 
-        result = insert_real_estate({**_SAMPLE_LISTING})
+        result = insert_real_estate({**SAMPLE_LISTING})
 
         assert result.success is True
         assert result.attempts == 2
@@ -117,7 +93,7 @@ class TestInsertRealEstate:
 
 class TestUpdateRealEstate:
     def test_update_success(self, db_conn):
-        _insert_sample(db_conn)
+        insert_sample_listing(db_conn)
         result = update_real_estate({"listing_id": "LST-9001", "listing_status": "Sold"})
         assert result.success is True
         assert result.data["listing_status"] == "Sold"
@@ -145,7 +121,7 @@ class TestUpdateRealEstate:
             "app.tools.real_estate_tools.RealEstateRepository.exists", MagicMock(return_value=True)
         )
         mock_update = MagicMock(
-            side_effect=[Exception("database is locked"), {**_SAMPLE_LISTING, "listing_status": "Sold"}]
+            side_effect=[Exception("database is locked"), {**SAMPLE_LISTING, "listing_status": "Sold"}]
         )
         monkeypatch.setattr("app.tools.real_estate_tools.RealEstateRepository.update", mock_update)
 
@@ -153,12 +129,12 @@ class TestUpdateRealEstate:
 
         assert result.success is True
         assert result.attempts == 2
-        assert mock_update.call_count == 2
+        assert mock_query_count := mock_update.call_count == 2
 
 
 class TestDeleteRealEstate:
     def test_delete_success(self, db_conn):
-        _insert_sample(db_conn)
+        insert_sample_listing(db_conn)
         result = delete_real_estate({"listing_id": "LST-9001"})
         assert result.success is True
         assert result.data == {"listing_id": "LST-9001", "deleted": True}
@@ -172,8 +148,6 @@ class TestDeleteRealEstate:
         assert result.attempts == 2
 
     def test_delete_never_accepts_a_filter(self, monkeypatch):
-        # RealEstateDelete only has `listing_id` — passing a filter-shaped
-        # payload instead is a validation failure, not a broad delete.
         mock_delete = MagicMock(side_effect=AssertionError("repository should not be called"))
         monkeypatch.setattr("app.tools.real_estate_tools.RealEstateRepository.delete", mock_delete)
 

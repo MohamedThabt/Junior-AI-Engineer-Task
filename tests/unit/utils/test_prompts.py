@@ -1,4 +1,4 @@
-"""Tests for `app/agent/prompts.py` — system prompt template (issue #8)."""
+"""Tests for `app/agent/prompts.py` — system prompt template."""
 
 from app.agent.prompts import build_system_prompt
 

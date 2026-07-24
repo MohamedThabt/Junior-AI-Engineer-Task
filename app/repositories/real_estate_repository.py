@@ -119,11 +119,13 @@ class RealEstateRepository:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def update(listing_id: str, fields: dict) -> dict:
+    def update(listing_id: str, fields: dict) -> dict | None:
         """Update *fields* on the listing identified by *listing_id* and
         return the updated row."""
         conn = get_connection(timeout=settings.tool_timeout_seconds)
         try:
+            if not fields:
+                return RealEstateRepository._fetch_by_id(conn, listing_id)
             set_clause = ", ".join(f"{col} = ?" for col in fields)
             values = list(fields.values()) + [listing_id]
             try:

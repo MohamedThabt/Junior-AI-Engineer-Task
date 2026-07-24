@@ -71,3 +71,63 @@ def _patch_get_connection(db_conn, monkeypatch):
         except AttributeError:
             pass  # module not imported yet — that's fine
 
+
+# ---------------------------------------------------------------------------
+# Shared Test Datasets & Helper Functions
+# ---------------------------------------------------------------------------
+
+SAMPLE_LISTING = {
+    "listing_id": "LST-9001",
+    "property_type": "House",
+    "city": "Austin",
+    "state": "Texas",
+    "bedrooms": 4,
+    "bathrooms": 2.5,
+    "square_footage": 2200,
+    "year_built": 2005,
+    "list_price": 450000.0,
+    "sale_price": None,
+    "listing_status": "Active",
+}
+
+SAMPLE_CAMPAIGN = {
+    "campaign_id": "CMP-9001",
+    "campaign_name": "Test Campaign",
+    "channel": "Facebook",
+    "start_date": "2025-04-11",
+    "end_date": "2025-05-08",
+    "budget_allocated": 25000.0,
+    "amount_spent": 23697.26,
+    "impressions": 5058725,
+    "clicks": 248564,
+    "conversions": 13472,
+    "revenue_generated": 67314.37,
+}
+
+
+def insert_sample_listing(db_conn, overrides: dict | None = None) -> dict:
+    """Insert a sample listing into the in-memory test database."""
+    data = {**SAMPLE_LISTING, **(overrides or {})}
+    cols = ", ".join(data.keys())
+    placeholders = ", ".join("?" for _ in data)
+    db_conn.execute(
+        f"INSERT INTO real_estate_listings ({cols}) VALUES ({placeholders})",
+        list(data.values()),
+    )
+    db_conn.commit()
+    return data
+
+
+def insert_sample_campaign(db_conn, overrides: dict | None = None) -> dict:
+    """Insert a sample campaign into the in-memory test database."""
+    data = {**SAMPLE_CAMPAIGN, **(overrides or {})}
+    cols = ", ".join(data.keys())
+    placeholders = ", ".join("?" for _ in data)
+    db_conn.execute(
+        f"INSERT INTO marketing_campaigns ({cols}) VALUES ({placeholders})",
+        list(data.values()),
+    )
+    db_conn.commit()
+    return data
+
+
