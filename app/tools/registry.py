@@ -117,6 +117,13 @@ TOOL_REGISTRY: dict[str, Callable[..., Any]] = {
     name: fn for name, fn, _model, _description in _TOOL_DEFINITIONS
 }
 
+# Tool name -> Pydantic input model, so the executor (issue #13) can
+# validate args against the right model *before* invoking the callable,
+# without re-deriving `_TOOL_DEFINITIONS` itself.
+TOOL_INPUT_MODELS: dict[str, type] = {
+    name: model for name, _fn, model, _description in _TOOL_DEFINITIONS
+}
+
 TOOL_SCHEMAS: list[dict] = [
     {
         "name": name,

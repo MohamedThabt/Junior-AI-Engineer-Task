@@ -136,6 +136,21 @@ def log_tool_call(
     )
 
 
+def log_security_event(*, request_id: str, pattern_type: str) -> None:
+    """Distinct log line for a rejected request (`AgentController`).
+
+    Only the matched *pattern type* is logged (e.g. `"email"`, `"api_key"`)
+    — never the matched value itself, so a secret can never leak into the
+    log file via this path."""
+    _emit(
+        {
+            "event": "security_reject",
+            "request_id": request_id,
+            "pattern_type": pattern_type,
+        }
+    )
+
+
 def log_session_event(event: str, session_id: str, request_id: str, is_new: bool) -> None:
     """Distinct milestone log for session start/resume — the anchor line for
     tracing a full request end-to-end by `request_id`."""

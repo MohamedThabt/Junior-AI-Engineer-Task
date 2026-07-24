@@ -91,6 +91,25 @@ class ChatSessionRepository:
         finally:
             conn.close()
 
+    @staticmethod
+    def get_or_create(session_id: str | None, default_session_name: str) -> tuple[str, list, bool]:
+        """Resolve *session_id* to an existing session, or create a new one.
+
+        Returns ``(resolved_session_id, context, is_new)``. A missing or
+        stale/unknown ``session_id`` is treated the same way (a fresh
+        session is created) so a client can always continue the
+        conversation with whatever id comes back, even after a bad id.
+        """
+        if session_id:
+            existing = ChatSessionRepository.get_session(session_id)
+            if existing is not None:
+                raw_context = existing.get("context")
+                context = json.loads(raw_context) if isinstance(raw_context, str) else (raw_context or [])
+                return session_id, context, False
+
+        new_id = ChatSessionRepository.create_session(default_session_name)
+        return new_id, [], True
+
     # ------------------------------------------------------------------
     # Update
     # ------------------------------------------------------------------

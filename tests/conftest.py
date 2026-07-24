@@ -41,7 +41,7 @@ def db_conn():
     test body are visible to repository helpers that call
     ``get_connection()``.
     """
-    conn = sqlite3.connect(":memory:")
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     init_db(conn)

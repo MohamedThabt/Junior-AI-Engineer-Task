@@ -129,7 +129,7 @@ class TestUpdateRealEstate:
 
         assert result.success is True
         assert result.attempts == 2
-        assert mock_query_count := mock_update.call_count == 2
+        assert mock_update.call_count == 2
 
 
 class TestDeleteRealEstate:
