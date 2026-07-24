@@ -204,28 +204,28 @@ export function AgentChatView({
             {messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                className={`flex gap-2.5 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                {/* Agent Solid Avatar Icon */}
+                {/* Agent Avatar Icon */}
                 {msg.role === "agent" && (
-                  <div className="w-7 h-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-cyan-400 shadow-sm flex-shrink-0 mt-0.5">
+                  <div className="w-6 h-6 rounded-md bg-zinc-900 border border-zinc-800 flex items-center justify-center text-cyan-400 flex-shrink-0 mt-0.5 shadow-sm">
                     <Bot className="w-3.5 h-3.5" />
                   </div>
                 )}
 
                 {/* Message Content Bubble */}
                 <div
-                  className={`max-w-[90%] md:max-w-[85%] rounded-xl px-4 py-3 text-xs leading-relaxed shadow-sm transition-all ${
+                  className={`max-w-[88%] md:max-w-[82%] rounded-lg px-3.5 py-2.5 text-xs leading-relaxed shadow-sm ${
                     msg.role === "user"
-                      ? "bg-gradient-to-b from-[#131927] to-[#0f1420] border border-cyan-800/40 hover:border-cyan-700/60 text-zinc-100 rounded-tr-xs"
+                      ? "bg-zinc-900/90 border border-cyan-800/40 text-zinc-100 rounded-tr-none"
                       : msg.isError
-                      ? "bg-rose-950/40 border border-rose-800 text-rose-200 rounded-tl-xs"
-                      : "bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-tl-xs"
+                      ? "bg-rose-950/40 border border-rose-800/80 text-rose-200 rounded-tl-none"
+                      : "bg-zinc-900/80 border border-zinc-800/80 text-zinc-200 rounded-tl-none"
                   }`}
                 >
-                  {/* Header */}
+                  {/* Minimal Header */}
                   <div
-                    className={`flex items-center justify-between gap-4 mb-2 pb-1.5 border-b text-[10px] font-mono ${
+                    className={`flex items-center justify-between gap-3 mb-1.5 pb-1 border-b text-[10px] font-mono ${
                       msg.role === "user"
                         ? "border-cyan-800/30 text-cyan-300/80"
                         : "border-zinc-800/60 text-zinc-400/80"
@@ -233,27 +233,20 @@ export function AgentChatView({
                   >
                     <div className="flex items-center gap-1.5 font-medium">
                       {msg.role === "user" ? (
-                        <>
-                          <User className="w-3 h-3 text-cyan-400" />
-                          <span className="text-cyan-200">You</span>
-                        </>
+                        <span className="text-cyan-200">You</span>
                       ) : (
-                        <>
-                          <Bot className="w-3 h-3 text-cyan-400" />
-                          <span className="text-zinc-300">Agent Loop</span>
-                        </>
+                        <span className="text-zinc-300">Agent</span>
                       )}
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <span className="opacity-70">
+                      <span className="opacity-60 text-[10px]">
                         {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
+                      {/* Single Copy Button */}
                       <button
                         onClick={() => handleCopy(msg.id, msg.content)}
-                        className={`opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded ${
-                          msg.role === "user" ? "hover:text-cyan-200" : "hover:text-zinc-200"
-                        }`}
+                        className="opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded text-zinc-400 hover:text-zinc-200"
                         title="Copy message text"
                       >
                         {copiedId === msg.id ? (
@@ -283,33 +276,17 @@ export function AgentChatView({
                     />
                   )}
 
-                  {/* Action Bar for Agent */}
-                  {msg.role === "agent" && (
-                    <div className="mt-2.5 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between text-[10px] text-zinc-500 font-mono">
-                      <span>{msg.request_id ? `ID: ${msg.request_id}` : "Verified Agent Response"}</span>
-                      <button
-                        onClick={() => handleCopy(msg.id, msg.content)}
-                        className="hover:text-zinc-200 flex items-center gap-1 transition-colors"
-                      >
-                        {copiedId === msg.id ? (
-                          <>
-                            <Check className="w-3 h-3 text-emerald-400" />
-                            <span>Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
+                  {/* Request ID Footer (Minimal, no duplicate copy button) */}
+                  {msg.role === "agent" && msg.request_id && !msg.execution_trace && (
+                    <div className="mt-1.5 pt-1 border-t border-zinc-800/50 text-[10px] text-zinc-500 font-mono">
+                      <span>ID: {msg.request_id}</span>
                     </div>
                   )}
                 </div>
 
-                {/* User Solid Avatar Icon */}
+                {/* User Avatar Icon */}
                 {msg.role === "user" && (
-                  <div className="w-7 h-7 rounded-lg bg-cyan-950/80 border border-cyan-800/60 flex items-center justify-center text-cyan-400 shadow-sm flex-shrink-0 mt-0.5">
+                  <div className="w-6 h-6 rounded-md bg-cyan-950/60 border border-cyan-800/50 flex items-center justify-center text-cyan-400 flex-shrink-0 mt-0.5 shadow-sm">
                     <User className="w-3.5 h-3.5" />
                   </div>
                 )}
