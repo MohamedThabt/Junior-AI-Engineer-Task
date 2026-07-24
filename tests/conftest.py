@@ -63,7 +63,7 @@ def _patch_get_connection(db_conn, monkeypatch):
     # Also patch each repository module that imported the function at module level.
     for mod_path in (
         "app.repositories.real_estate_repository.get_connection",
-        "app.repositories.marketing_repository.get_connection",
+        "app.repositories.campaign_repository.get_connection",
         "app.repositories.chat_session_repository.get_connection",
     ):
         try:
