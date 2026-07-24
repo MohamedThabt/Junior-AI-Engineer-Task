@@ -48,14 +48,15 @@ export function SessionContextViewer({ isOpen, onClose, session }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Stored Session Context & Memory"
-      description={`Inspect SQLite ChatSessionRepository state for "${session.session_name}" [${session.id.slice(0, 8)}]`}
+      description={`Inspect SQLite ChatSessionRepository state for "${session.session_name}" [${(session.id || session.session_id || "").slice(0, 8)}]`}
     >
       <div className="space-y-3">
         <div className="flex items-center justify-between font-mono text-xs text-zinc-400">
           <div className="flex items-center gap-2">
             <Database className="w-3.5 h-3.5 text-cyan-400" />
-            <span>DB Record ID: <code className="text-zinc-200">{session.id}</code></span>
+            <span>DB Record ID: <code className="text-zinc-200">{session.id || session.session_id}</code></span>
           </div>
+
 
           <div className="flex items-center gap-2">
             <button

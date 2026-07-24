@@ -49,6 +49,18 @@ class ChatSessionRepository:
             conn.close()
 
     @staticmethod
+    def list_sessions() -> list[dict]:
+        """Return all sessions without context blob, sorted by created_at descending."""
+        conn = get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT id, session_name, created_at, updated_at FROM chat_sessions ORDER BY created_at DESC"
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_all_sessions() -> list[dict]:
         """Return all sessions sorted by created_at descending."""
         conn = get_connection()
@@ -59,6 +71,7 @@ class ChatSessionRepository:
             return [dict(row) for row in rows]
         finally:
             conn.close()
+
 
     @staticmethod
     def get_context(session_id: str) -> list:
