@@ -206,30 +206,67 @@ export function AgentChatView({
                 key={msg.id}
                 className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                {/* Agent Solid Icon */}
+                {/* Agent Solid Avatar Icon */}
                 {msg.role === "agent" && (
-                  <Bot className="w-4 h-4 text-cyan-400 mt-1 flex-shrink-0" />
+                  <div className="w-7 h-7 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-cyan-400 shadow-sm flex-shrink-0 mt-0.5">
+                    <Bot className="w-3.5 h-3.5" />
+                  </div>
                 )}
 
                 {/* Message Content Bubble */}
                 <div
-                  className={`max-w-[90%] md:max-w-[85%] rounded-lg px-4 py-3 text-xs leading-relaxed ${
+                  className={`max-w-[90%] md:max-w-[85%] rounded-xl px-4 py-3 text-xs leading-relaxed shadow-sm transition-all ${
                     msg.role === "user"
-                      ? "bg-zinc-100 text-zinc-950 font-medium"
+                      ? "bg-gradient-to-b from-[#131927] to-[#0f1420] border border-cyan-800/40 hover:border-cyan-700/60 text-zinc-100 rounded-tr-xs"
                       : msg.isError
-                      ? "bg-rose-950/40 border border-rose-800 text-rose-200"
-                      : "bg-zinc-900 border border-zinc-800 text-zinc-200"
+                      ? "bg-rose-950/40 border border-rose-800 text-rose-200 rounded-tl-xs"
+                      : "bg-zinc-900 border border-zinc-800 text-zinc-200 rounded-tl-xs"
                   }`}
                 >
                   {/* Header */}
-                  <div className="flex items-center justify-between gap-4 mb-1.5 pb-1 border-b border-zinc-800/60 text-[10px] opacity-60 font-mono">
-                    <span>{msg.role === "user" ? "You" : "Agent Loop"}</span>
-                    <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  <div
+                    className={`flex items-center justify-between gap-4 mb-2 pb-1.5 border-b text-[10px] font-mono ${
+                      msg.role === "user"
+                        ? "border-cyan-800/30 text-cyan-300/80"
+                        : "border-zinc-800/60 text-zinc-400/80"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 font-medium">
+                      {msg.role === "user" ? (
+                        <>
+                          <User className="w-3 h-3 text-cyan-400" />
+                          <span className="text-cyan-200">You</span>
+                        </>
+                      ) : (
+                        <>
+                          <Bot className="w-3 h-3 text-cyan-400" />
+                          <span className="text-zinc-300">Agent Loop</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="opacity-70">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <button
+                        onClick={() => handleCopy(msg.id, msg.content)}
+                        className={`opacity-60 hover:opacity-100 transition-opacity p-0.5 rounded ${
+                          msg.role === "user" ? "hover:text-cyan-200" : "hover:text-zinc-200"
+                        }`}
+                        title="Copy message text"
+                      >
+                        {copiedId === msg.id ? (
+                          <Check className="w-3 h-3 text-emerald-400" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Text Content */}
-                  <MarkdownRenderer content={msg.content} />
-
+                  <MarkdownRenderer content={msg.content} isUser={msg.role === "user"} />
 
                   {/* Agent Internal Execution Trace Component */}
                   {msg.role === "agent" && msg.execution_trace && (
@@ -270,9 +307,11 @@ export function AgentChatView({
                   )}
                 </div>
 
-                {/* User Solid Icon */}
+                {/* User Solid Avatar Icon */}
                 {msg.role === "user" && (
-                  <User className="w-4 h-4 text-zinc-500 mt-1 flex-shrink-0" />
+                  <div className="w-7 h-7 rounded-lg bg-cyan-950/80 border border-cyan-800/60 flex items-center justify-center text-cyan-400 shadow-sm flex-shrink-0 mt-0.5">
+                    <User className="w-3.5 h-3.5" />
+                  </div>
                 )}
               </div>
             ))}
