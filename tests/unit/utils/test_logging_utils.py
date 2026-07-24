@@ -32,7 +32,7 @@ def test_log_llm_call_writes_all_required_fields(tmp_path, monkeypatch):
     logging_utils.log_llm_call(
         request_id="req-1",
         step_number=1,
-        model="gemini-3.1-flash-lite",
+        model="llama-3.3-70b-versatile",
         prompt_tokens=10,
         completion_tokens=5,
         total_tokens=15,

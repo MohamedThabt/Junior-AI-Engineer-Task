@@ -9,6 +9,7 @@ planner calls `call_llm(...)` and never implements retry itself.
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import dataclass, field
 
@@ -35,19 +36,24 @@ class LLMResponse:
 
 
 def _parse_response(raw) -> LLMResponse:
-    usage = getattr(raw, "usage_metadata", None)
-    prompt_tokens = getattr(usage, "prompt_token_count", 0) or 0
-    completion_tokens = getattr(usage, "candidates_token_count", 0) or 0
-    total_tokens = getattr(usage, "total_token_count", 0) or (prompt_tokens + completion_tokens)
+    """Parse a Groq/OpenAI-shaped `ChatCompletion` (`raw.usage`,
+    `raw.choices[0].message`)."""
+    usage = getattr(raw, "usage", None)
+    prompt_tokens = getattr(usage, "prompt_tokens", 0) or 0
+    completion_tokens = getattr(usage, "completion_tokens", 0) or 0
+    total_tokens = getattr(usage, "total_tokens", 0) or (prompt_tokens + completion_tokens)
+
+    message = raw.choices[0].message
 
     tool_calls = []
-    for call in getattr(raw, "function_calls", None) or []:
-        tool_calls.append({"tool_name": call.name, "args": dict(call.args or {})})
+    for call in getattr(message, "tool_calls", None) or []:
+        try:
+            args = json.loads(call.function.arguments or "{}")
+        except (TypeError, ValueError):
+            args = {}
+        tool_calls.append({"tool_name": call.function.name, "args": args})
 
-    try:
-        text = raw.text
-    except Exception:
-        text = None
+    text = getattr(message, "content", None)
 
     return LLMResponse(
         raw=raw,

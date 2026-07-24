@@ -4,6 +4,7 @@ The provider client is faked out via monkeypatching `get_llm_client` so
 these tests never hit a real LLM API.
 """
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -14,19 +15,23 @@ from app.agent.llm_client import LLMCallError, call_llm
 
 def _fake_raw_response(prompt_tokens=10, completion_tokens=5, text="final answer", tool_calls=None):
     total_tokens = prompt_tokens + completion_tokens
-    usage_metadata = SimpleNamespace(
-        prompt_token_count=prompt_tokens,
-        candidates_token_count=completion_tokens,
-        total_token_count=total_tokens,
+    usage = SimpleNamespace(
+        prompt_tokens=prompt_tokens,
+        completion_tokens=completion_tokens,
+        total_tokens=total_tokens,
     )
-    function_calls = [
-        SimpleNamespace(name=call["tool_name"], args=call["args"]) for call in (tool_calls or [])
+    fake_tool_calls = [
+        SimpleNamespace(
+            function=SimpleNamespace(name=call["tool_name"], arguments=json.dumps(call["args"]))
+        )
+        for call in (tool_calls or [])
     ]
-    return SimpleNamespace(usage_metadata=usage_metadata, function_calls=function_calls, text=text)
+    message = SimpleNamespace(content=text, tool_calls=fake_tool_calls)
+    return SimpleNamespace(usage=usage, choices=[SimpleNamespace(message=message)])
 
 
 class _FakeProviderClient:
-    """Stands in for GeminiClient: `responses` is a queue of either an
+    """Stands in for GroqClient: `responses` is a queue of either an
     Exception instance (to raise) or a raw response (to return)."""
 
     def __init__(self, responses):
@@ -68,7 +73,7 @@ def test_call_llm_success_returns_parsed_response_with_cost(monkeypatch, logged_
     response = call_llm(
         messages=[{"role": "user", "content": "hi"}],
         tools=[],
-        model="gemini-3.1-flash-lite",
+        model="llama-3.3-70b-versatile",
         step_number=1,
         request_id="req-1",
     )
@@ -77,7 +82,7 @@ def test_call_llm_success_returns_parsed_response_with_cost(monkeypatch, logged_
     assert response.prompt_tokens == 10
     assert response.completion_tokens == 5
     assert response.total_tokens == 15
-    expected_cost = round((10 / 1000) * 0.00025 + (5 / 1000) * 0.0015, 8)
+    expected_cost = round((10 / 1000) * 0.00059 + (5 / 1000) * 0.00079, 8)
     assert len(logged_calls) == 1
     assert logged_calls[0]["cost_usd"] == expected_cost
     assert logged_calls[0]["success"] is True
@@ -100,7 +105,7 @@ def test_call_llm_retries_then_succeeds(monkeypatch, logged_calls):
     response = call_llm(
         messages=[{"role": "user", "content": "hi"}],
         tools=[],
-        model="gemini-3.1-flash-lite",
+        model="llama-3.3-70b-versatile",
         step_number=1,
     )
 
@@ -120,7 +125,7 @@ def test_call_llm_raises_llm_call_error_after_exhausting_retries(monkeypatch, lo
         call_llm(
             messages=[{"role": "user", "content": "hi"}],
             tools=[],
-            model="gemini-3.1-flash-lite",
+            model="llama-3.3-70b-versatile",
             step_number=1,
         )
 

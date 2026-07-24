@@ -46,6 +46,28 @@ class TestToolSchemas:
             assert parameters.get("type") == "object"
             assert "properties" in parameters
 
+    def test_numeric_optional_params_also_accept_a_string(self):
+        """Regression test: Groq's tool-call validator rejected a real
+        request with `max_price: "400000"` (string) because the advertised
+        schema only allowed `number`/`null`, even though Pydantic itself
+        coerces that string to a float without issue."""
+        by_name = {schema["name"]: schema for schema in TOOL_SCHEMAS}
+        max_price_schema = by_name["query_real_estate"]["parameters"]["properties"]["max_price"]
+
+        branch_types = {branch.get("type") for branch in max_price_schema["anyOf"]}
+
+        assert "number" in branch_types
+        assert "string" in branch_types
+
+    def test_numeric_required_params_also_accept_a_string(self):
+        by_name = {schema["name"]: schema for schema in TOOL_SCHEMAS}
+        bedrooms_schema = by_name["insert_real_estate"]["parameters"]["properties"]["bedrooms"]
+
+        branch_types = {branch.get("type") for branch in bedrooms_schema["anyOf"]}
+
+        assert "integer" in branch_types
+        assert "string" in branch_types
+
     def test_write_schemas_require_exact_primary_key(self):
         by_name = {schema["name"]: schema for schema in TOOL_SCHEMAS}
 

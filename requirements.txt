@@ -14,7 +14,7 @@ python-dotenv==1.2.2
 httpx==0.28.1
 
 # LLM Providers
-google-genai==2.14.0
+groq==1.6.0
 
 # Excel / Data I/O
 pandas==2.2.3

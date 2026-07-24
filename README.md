@@ -47,7 +47,7 @@ Copy-Item .env.example .env
 cp .env.example .env
 ```
 
-*(Optional)* Set your free LLM API key (e.g. Groq, Gemini) inside `.env` if required by your setup:
+*(Optional)* Set your free Groq API key inside `.env` if required by your setup:
 ```env
 LLM_PROVIDER=groq
 GROQ_API_KEY=your_free_groq_api_key_here
@@ -105,7 +105,7 @@ Try asking the assistant queries like:
 │   ├── controllers/      # REST API route handlers
 │   ├── agent/            # ReAct agent loop: planner, executor, loop controller,
 │   │                     #   LLM client (app/agent/llm_client.py) & LLM provider
-│   │                     #   factory (app/agent/llm_factory.py, Gemini today)
+│   │                     #   factory (app/agent/llm_factory.py, Groq today)
 │   ├── tools/            # LLM-callable tools (query/insert/update/delete + finalize)
 │   ├── repositories/     # SQLite Data access layer (Real Estate, Marketing, Chat Session)
 │   ├── models/           # Data schemas & validation models (Pydantic DTOs)

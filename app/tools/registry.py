@@ -5,7 +5,9 @@ scope here) uses — tools are never imported/called directly anywhere else.
 `TOOL_SCHEMAS` is what gets passed to the LLM for function-calling; every
 parameter schema is derived from the matching Pydantic model in
 `app/models/schemas.py` (via `model_json_schema()`) so the validation rules
-and the LLM-facing schema can never drift apart.
+and the LLM-facing schema can never drift apart. `_relax_numeric_params`
+then widens numeric properties in-place (see its docstring) before the
+schema is handed to the LLM provider.
 """
 
 from __future__ import annotations
@@ -124,11 +126,53 @@ TOOL_INPUT_MODELS: dict[str, type] = {
     name: model for name, _fn, model, _description in _TOOL_DEFINITIONS
 }
 
+_NUMERIC_JSON_TYPES = {"number", "integer"}
+
+
+def _allow_numeric_strings(prop_schema: dict) -> dict:
+    """Add a `"string"` alternative to a numeric property's schema.
+
+    Groq's tool-call validator strictly rejects the whole request (HTTP
+    400, `tool_use_failed`) whenever the model emits a quoted number
+    (`"400000"`) for a parameter declared as `"type": "number"` — even
+    though Pydantic already coerces that same string to a `float` without
+    complaint once it reaches our own validation (confirmed:
+    `RealEstateFilters(max_price="400000").max_price == 400.0`). Since our
+    side handles the coercion safely either way, widening the *advertised*
+    schema to also accept a string lets Groq's stricter validator pass the
+    call through instead of failing before we ever see it.
+    """
+    if "anyOf" in prop_schema:
+        branches = prop_schema["anyOf"]
+        if {branch.get("type") for branch in branches} & _NUMERIC_JSON_TYPES:
+            if not any(branch.get("type") == "string" for branch in branches):
+                branches.append({"type": "string"})
+        return prop_schema
+
+    if prop_schema.get("type") in _NUMERIC_JSON_TYPES:
+        numeric_branch = {k: v for k, v in prop_schema.items() if k not in ("title", "default")}
+        widened = {"anyOf": [numeric_branch, {"type": "string"}]}
+        for key in ("title", "default"):
+            if key in prop_schema:
+                widened[key] = prop_schema[key]
+        return widened
+
+    return prop_schema
+
+
+def _relax_numeric_params(parameters: dict) -> dict:
+    properties = parameters.get("properties")
+    if isinstance(properties, dict):
+        for name, prop_schema in properties.items():
+            properties[name] = _allow_numeric_strings(prop_schema)
+    return parameters
+
+
 TOOL_SCHEMAS: list[dict] = [
     {
         "name": name,
         "description": description,
-        "parameters": model.model_json_schema(),
+        "parameters": _relax_numeric_params(model.model_json_schema()),
     }
     for name, _fn, model, description in _TOOL_DEFINITIONS
 ]

@@ -24,14 +24,14 @@ class Settings(BaseSettings):
     # LLM provider selection: LLM_PROVIDER/LLM_MODEL are generic so the same
     # settings shape works for any provider; the API key is provider-specific
     # so multiple providers can be configured side by side.
-    llm_provider: str = Field(default="gemini", alias="LLM_PROVIDER")
-    llm_model: str = Field(default="gemini-3.1-flash-lite", alias="LLM_MODEL")
-    gemini_api_key: str = Field(default="", alias="GEMINI_API_KEY")
+    llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")
+    llm_model: str = Field(default="llama-3.3-70b-versatile", alias="LLM_MODEL")
+    groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
 
     # Static per-model pricing table ($ per 1K tokens), used to compute
     # cost_usd for every LLM call without any external pricing lookup.
     PRICING: dict = {
-        "gemini-3.1-flash-lite": {"input_per_1k": 0.00025, "output_per_1k": 0.0015},
+        "llama-3.3-70b-versatile": {"input_per_1k": 0.00059, "output_per_1k": 0.00079},
     }
 
     model_config = SettingsConfigDict(
