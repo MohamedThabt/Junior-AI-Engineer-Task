@@ -18,6 +18,7 @@ import {
   Database
 } from "lucide-react"
 import { AgentExecutionTrace } from "./AgentExecutionTrace"
+import { MarkdownRenderer } from "./MarkdownRenderer"
 import { scanForPII } from "../lib/api"
 
 const PROMPT_STARTERS = [
@@ -54,8 +55,6 @@ export function AgentChatView({
   onClearMessages,
   isLoading,
   healthStatus,
-  onOpenToolsDrawer,
-  onOpenDataDrawer,
   onOpenContextViewer,
 }) {
   const [inputPrompt, setInputPrompt] = useState("")
@@ -115,34 +114,14 @@ export function AgentChatView({
         <div className="flex items-center space-x-2">
           {/* Quick Inspector Badges */}
           {session && (
-            <>
-              <button
-                onClick={onOpenDataDrawer}
-                className="hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-300 hover:border-zinc-700 transition-colors"
-                title="View database tables"
-              >
-                <Database className="w-3 h-3 text-cyan-400" />
-                Data Explorer
-              </button>
-
-              <button
-                onClick={onOpenToolsDrawer}
-                className="hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-300 hover:border-zinc-700 transition-colors"
-                title="View agent tool registry"
-              >
-                <Wrench className="w-3 h-3 text-purple-400" />
-                Tools (9)
-              </button>
-
-              <button
-                onClick={onOpenContextViewer}
-                className="hidden md:flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-300 hover:border-zinc-700 transition-colors"
-                title="View stored session context"
-              >
-                <Cpu className="w-3 h-3 text-emerald-400" />
-                DB Context
-              </button>
-            </>
+            <button
+              onClick={onOpenContextViewer}
+              className="flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-300 hover:border-zinc-700 transition-colors"
+              title="View stored session context"
+            >
+              <Cpu className="w-3 h-3 text-emerald-400" />
+              DB Context
+            </button>
           )}
 
           <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-mono text-[11px] pl-2 border-l border-zinc-800">
@@ -249,9 +228,8 @@ export function AgentChatView({
                   </div>
 
                   {/* Text Content */}
-                  <div className="whitespace-pre-wrap leading-relaxed">
-                    {msg.content}
-                  </div>
+                  <MarkdownRenderer content={msg.content} />
+
 
                   {/* Agent Internal Execution Trace Component */}
                   {msg.role === "agent" && msg.execution_trace && (

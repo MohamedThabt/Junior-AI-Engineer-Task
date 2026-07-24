@@ -1,8 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { AgentSidebar } from "./components/AgentSidebar"
 import { AgentChatView } from "./components/AgentChatView"
-import { ToolRegistryDrawer } from "./components/ToolRegistryDrawer"
-import { DomainDataDrawer } from "./components/DomainDataDrawer"
 import { SessionContextViewer } from "./components/SessionContextViewer"
 import { Modal } from "./components/ui/Modal"
 import { Input } from "./components/ui/Input"
@@ -36,13 +34,12 @@ export default function App() {
   const [createError, setCreateError] = useState(null)
 
   // Inspector Drawers state
-  const [isToolsDrawerOpen, setIsToolsDrawerOpen] = useState(false)
-  const [isDataDrawerOpen, setIsDataDrawerOpen] = useState(false)
   const [isContextViewerOpen, setIsContextViewerOpen] = useState(false)
 
   // API Settings Modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [customApiUrl, setCustomApiUrl] = useState(getStoredBaseUrl())
+
 
   // Check health
   const checkHealth = useCallback(async () => {
@@ -207,8 +204,6 @@ export default function App() {
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
         onOpenSettings={() => setIsSettingsOpen(true)}
-        onOpenToolsDrawer={() => setIsToolsDrawerOpen(true)}
-        onOpenDataDrawer={() => setIsDataDrawerOpen(true)}
         onOpenContextViewer={() => setIsContextViewerOpen(true)}
       />
 
@@ -220,21 +215,7 @@ export default function App() {
         onClearMessages={handleClearMessages}
         isLoading={isAgentResponding}
         healthStatus={healthStatus}
-        onOpenToolsDrawer={() => setIsToolsDrawerOpen(true)}
-        onOpenDataDrawer={() => setIsDataDrawerOpen(true)}
         onOpenContextViewer={() => setIsContextViewerOpen(true)}
-      />
-
-      {/* Tools Registry Drawer Modal */}
-      <ToolRegistryDrawer
-        isOpen={isToolsDrawerOpen}
-        onClose={() => setIsToolsDrawerOpen(false)}
-      />
-
-      {/* Domain Data Tables Explorer Modal */}
-      <DomainDataDrawer
-        isOpen={isDataDrawerOpen}
-        onClose={() => setIsDataDrawerOpen(false)}
       />
 
       {/* Session Context Memory Viewer Modal */}
@@ -243,6 +224,7 @@ export default function App() {
         onClose={() => setIsContextViewerOpen(false)}
         session={selectedSession}
       />
+
 
       {/* Create New Session Modal */}
       <Modal

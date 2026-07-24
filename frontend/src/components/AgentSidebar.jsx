@@ -27,8 +27,6 @@ export function AgentSidebar({
   isCollapsed,
   setIsCollapsed,
   onOpenSettings,
-  onOpenToolsDrawer,
-  onOpenDataDrawer,
   onOpenContextViewer,
 }) {
   const [searchTerm, setSearchTerm] = useState("")
@@ -96,39 +94,22 @@ export function AgentSidebar({
       </div>
 
       {/* Quick Agent Inspector Tools Navigation */}
-      {!isCollapsed && (
+      {!isCollapsed && selectedSession && (
         <div className="px-3 pb-2 space-y-1">
           <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider px-1">
-            Agent Tools & Schemas
+            Session Memory
           </div>
 
           <button
-            onClick={onOpenToolsDrawer}
+            onClick={onOpenContextViewer}
             className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800/80 text-xs text-zinc-300 transition-colors"
           >
-            <Wrench className="w-3.5 h-3.5 text-purple-400" />
-            <span>Tools Inventory (9)</span>
+            <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Session Memory State</span>
           </button>
-
-          <button
-            onClick={onOpenDataDrawer}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800/80 text-xs text-zinc-300 transition-colors"
-          >
-            <Database className="w-3.5 h-3.5 text-cyan-400" />
-            <span>Database Tables</span>
-          </button>
-
-          {selectedSession && (
-            <button
-              onClick={onOpenContextViewer}
-              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md bg-zinc-900/80 hover:bg-zinc-800 border border-zinc-800/80 text-xs text-zinc-300 transition-colors"
-            >
-              <Cpu className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Session Memory State</span>
-            </button>
-          )}
         </div>
       )}
+
 
       {/* Search Bar */}
       {!isCollapsed && sessions.length > 0 && (
