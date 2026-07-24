@@ -31,3 +31,39 @@ def get_health() -> dict:
         return {"ok": False, "error": f"HTTP {exc.response.status_code}: {exc.response.text}"}
     except httpx.HTTPError as exc:
         return {"ok": False, "error": str(exc)}
+
+def get_sessions() -> dict:
+    """Fetch all chat sessions."""
+    url = f"{API_BASE_URL}/api/sessions/"
+    try:
+        response = httpx.get(url, timeout=_REQUEST_TIMEOUT)
+        response.raise_for_status()
+        return {"ok": True, "data": response.json()}
+    except httpx.HTTPStatusError as exc:
+        return {"ok": False, "error": f"HTTP {exc.response.status_code}: {exc.response.text}"}
+    except httpx.HTTPError as exc:
+        return {"ok": False, "error": str(exc)}
+
+def create_session(session_name: str) -> dict:
+    """Create a new chat session."""
+    url = f"{API_BASE_URL}/api/sessions/"
+    try:
+        response = httpx.post(url, json={"session_name": session_name}, timeout=_REQUEST_TIMEOUT)
+        response.raise_for_status()
+        return {"ok": True, "data": response.json()}
+    except httpx.HTTPStatusError as exc:
+        return {"ok": False, "error": f"HTTP {exc.response.status_code}: {exc.response.text}"}
+    except httpx.HTTPError as exc:
+        return {"ok": False, "error": str(exc)}
+
+def delete_session(session_id: str) -> dict:
+    """Delete a chat session."""
+    url = f"{API_BASE_URL}/api/sessions/{session_id}"
+    try:
+        response = httpx.delete(url, timeout=_REQUEST_TIMEOUT)
+        response.raise_for_status()
+        return {"ok": True, "data": None}
+    except httpx.HTTPStatusError as exc:
+        return {"ok": False, "error": f"HTTP {exc.response.status_code}: {exc.response.text}"}
+    except httpx.HTTPError as exc:
+        return {"ok": False, "error": str(exc)}

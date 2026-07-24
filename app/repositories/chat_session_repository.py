@@ -49,6 +49,18 @@ class ChatSessionRepository:
             conn.close()
 
     @staticmethod
+    def get_all_sessions() -> list[dict]:
+        """Return all sessions sorted by created_at descending."""
+        conn = get_connection()
+        try:
+            rows = conn.execute(
+                "SELECT * FROM chat_sessions ORDER BY created_at DESC"
+            ).fetchall()
+            return [dict(row) for row in rows]
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_context(session_id: str) -> list:
         """Return the deserialized context (message history) for a session.
 
@@ -82,3 +94,21 @@ class ChatSessionRepository:
             conn.commit()
         finally:
             conn.close()
+
+    # ------------------------------------------------------------------
+    # Delete
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def delete_session(session_id: str) -> bool:
+        """Delete a session by ID. Returns True if deleted, False if not found."""
+        conn = get_connection()
+        try:
+            cursor = conn.execute(
+                "DELETE FROM chat_sessions WHERE id = ?", (session_id,)
+            )
+            conn.commit()
+            return cursor.rowcount > 0
+        finally:
+            conn.close()
+
