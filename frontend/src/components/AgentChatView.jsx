@@ -7,37 +7,43 @@ import {
   Copy, 
   Check, 
   Building2, 
+  Megaphone, 
   Activity, 
   Terminal, 
   Cpu, 
   ChevronRight,
-  Trash2
+  Trash2,
+  ShieldAlert,
+  Wrench,
+  Database
 } from "lucide-react"
+import { AgentExecutionTrace } from "./AgentExecutionTrace"
+import { scanForPII } from "../lib/api"
 
 const PROMPT_STARTERS = [
   {
     icon: Building2,
-    title: "Cairo Real Estate Insights",
-    prompt: "Provide an analysis of the top residential investment areas in New Cairo and 6th of October City.",
-    category: "Real Estate",
+    title: "Real Estate Listings Query",
+    prompt: "Query active real estate property listings in Cairo with more than 3 bedrooms.",
+    category: "query_listings",
   },
   {
-    icon: Activity,
-    title: "Run System Diagnostic",
-    prompt: "Execute system diagnostics on backend services and check database health status.",
-    category: "Telemetry",
+    icon: Megaphone,
+    title: "Marketing Performance",
+    prompt: "Show performance metrics for Facebook marketing campaigns including budget, clicks, and revenue.",
+    category: "query_campaigns",
   },
   {
     icon: Terminal,
-    title: "SQL Query Assistant",
-    prompt: "Generate an optimized SQL query to retrieve property sessions created in the last 30 days.",
-    category: "Database",
+    title: "Update Campaign Budget",
+    prompt: "Update campaign CMP-8001 budget_allocated to 20000 USD using update_campaign tool.",
+    category: "update_campaign",
   },
   {
     icon: Cpu,
-    title: "AI Agent Capabilities",
-    prompt: "What tools and models are currently available in this AI Agent workspace?",
-    category: "Agent Info",
+    title: "System Diagnostics & Tools",
+    prompt: "Inspect available agent tools and test session context persistence.",
+    category: "Agent Telemetry",
   },
 ]
 
@@ -48,11 +54,17 @@ export function AgentChatView({
   onClearMessages,
   isLoading,
   healthStatus,
+  onOpenToolsDrawer,
+  onOpenDataDrawer,
+  onOpenContextViewer,
 }) {
   const [inputPrompt, setInputPrompt] = useState("")
   const [copiedId, setCopiedId] = useState(null)
   const messagesEndRef = useRef(null)
   const textareaRef = useRef(null)
+
+  // Live PII pre-flight scan
+  const piiScan = scanForPII(inputPrompt)
 
   // Auto scroll to bottom when new message arrives
   useEffect(() => {
@@ -85,9 +97,9 @@ export function AgentChatView({
   return (
     <div className="flex-1 flex flex-col h-full bg-[#09090b] relative overflow-hidden">
       {/* Header Bar */}
-      <header className="h-14 px-6 bg-[#09090b] border-b border-zinc-800/80 flex items-center justify-between z-10">
+      <header className="h-14 px-4 md:px-6 bg-[#09090b] border-b border-zinc-800/80 flex items-center justify-between z-10">
         <div className="flex items-center space-x-2.5">
-          <Bot className="w-5 h-5 text-zinc-200 flex-shrink-0" />
+          <Bot className="w-5 h-5 text-cyan-400 flex-shrink-0" />
           <div>
             <h2 className="text-xs font-semibold text-white tracking-tight flex items-center gap-2">
               {session ? session.session_name : "Select or Create Session"}
@@ -100,20 +112,51 @@ export function AgentChatView({
           </div>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-mono text-[11px]">
-            <span className={`w-1.5 h-1.5 rounded-full ${healthStatus?.ok ? "bg-emerald-500" : "bg-red-500"}`} />
-            {healthStatus?.ok ? "System Ready" : "Disconnected"}
+        <div className="flex items-center space-x-2">
+          {/* Quick Inspector Badges */}
+          {session && (
+            <>
+              <button
+                onClick={onOpenDataDrawer}
+                className="hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-300 hover:border-zinc-700 transition-colors"
+                title="View database tables"
+              >
+                <Database className="w-3 h-3 text-cyan-400" />
+                Data Explorer
+              </button>
+
+              <button
+                onClick={onOpenToolsDrawer}
+                className="hidden sm:flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-300 hover:border-zinc-700 transition-colors"
+                title="View agent tool registry"
+              >
+                <Wrench className="w-3 h-3 text-purple-400" />
+                Tools (9)
+              </button>
+
+              <button
+                onClick={onOpenContextViewer}
+                className="hidden md:flex items-center gap-1 px-2 py-1 rounded bg-zinc-900 border border-zinc-800 text-[11px] text-zinc-300 hover:border-zinc-700 transition-colors"
+                title="View stored session context"
+              >
+                <Cpu className="w-3 h-3 text-emerald-400" />
+                DB Context
+              </button>
+            </>
+          )}
+
+          <div className="flex items-center gap-1.5 text-xs text-zinc-400 font-mono text-[11px] pl-2 border-l border-zinc-800">
+            <span className={`w-1.5 h-1.5 rounded-full ${healthStatus?.ok ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+            {healthStatus?.ok ? "API Online" : "Offline"}
           </div>
 
           {messages.length > 0 && (
             <button
               onClick={onClearMessages}
-              className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-800/60 transition-colors"
+              className="text-xs text-zinc-400 hover:text-zinc-200 flex items-center gap-1 px-2 py-1 rounded hover:bg-zinc-800/60 transition-colors ml-1"
               title="Clear conversation"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              Clear
             </button>
           )}
         </div>
@@ -129,7 +172,7 @@ export function AgentChatView({
               AI Agent Workspace
             </h3>
             <p className="text-xs text-zinc-500 leading-relaxed">
-              Select an existing session from the sidebar or create a new session to begin interacting with the agent.
+              Select an existing session from the sidebar or create a new session to begin interacting with the agent architecture.
             </p>
           </div>
         ) : messages.length === 0 ? (
@@ -141,7 +184,7 @@ export function AgentChatView({
                 {session.session_name}
               </h2>
               <p className="text-xs text-zinc-400 max-w-md mx-auto">
-                Type your instructions below or select a prompt starter to begin.
+                Type instructions for the agent loop or select a prompt starter below.
               </p>
             </div>
 
@@ -156,7 +199,7 @@ export function AgentChatView({
                     className="group relative p-4 rounded-lg bg-zinc-900/90 hover:bg-zinc-800/60 border border-zinc-800/80 hover:border-zinc-700 transition-colors cursor-pointer space-y-2.5"
                   >
                     <div className="flex items-center justify-between">
-                      <IconComponent className="w-4 h-4 text-zinc-300" />
+                      <IconComponent className="w-4 h-4 text-cyan-400" />
                       <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider">
                         {item.category}
                       </span>
@@ -184,22 +227,24 @@ export function AgentChatView({
                 key={msg.id}
                 className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}
               >
-                {/* Agent Solid Icon without background */}
+                {/* Agent Solid Icon */}
                 {msg.role === "agent" && (
-                  <Bot className="w-4 h-4 text-zinc-400 mt-1 flex-shrink-0" />
+                  <Bot className="w-4 h-4 text-cyan-400 mt-1 flex-shrink-0" />
                 )}
 
                 {/* Message Content Bubble */}
                 <div
-                  className={`max-w-[85%] md:max-w-[80%] rounded-lg px-4 py-3 text-xs leading-relaxed ${
+                  className={`max-w-[90%] md:max-w-[85%] rounded-lg px-4 py-3 text-xs leading-relaxed ${
                     msg.role === "user"
                       ? "bg-zinc-100 text-zinc-950 font-medium"
+                      : msg.isError
+                      ? "bg-rose-950/40 border border-rose-800 text-rose-200"
                       : "bg-zinc-900 border border-zinc-800 text-zinc-200"
                   }`}
                 >
                   {/* Header */}
                   <div className="flex items-center justify-between gap-4 mb-1.5 pb-1 border-b border-zinc-800/60 text-[10px] opacity-60 font-mono">
-                    <span>{msg.role === "user" ? "You" : "Agent"}</span>
+                    <span>{msg.role === "user" ? "You" : "Agent Loop"}</span>
                     <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
 
@@ -208,10 +253,25 @@ export function AgentChatView({
                     {msg.content}
                   </div>
 
+                  {/* Agent Internal Execution Trace Component */}
+                  {msg.role === "agent" && msg.execution_trace && (
+                    <AgentExecutionTrace
+                      trace={msg.execution_trace}
+                      telemetry={{
+                        request_id: msg.request_id,
+                        tokens: msg.tokens,
+                        cost_usd: msg.cost_usd,
+                        latency_ms: msg.latency_ms,
+                      }}
+                      stepCount={msg.step_count}
+                      maxSteps={msg.max_steps || 5}
+                    />
+                  )}
+
                   {/* Action Bar for Agent */}
                   {msg.role === "agent" && (
                     <div className="mt-2.5 pt-1.5 border-t border-zinc-800/60 flex items-center justify-between text-[10px] text-zinc-500 font-mono">
-                      <span>Verified Agent Response</span>
+                      <span>{msg.request_id ? `ID: ${msg.request_id}` : "Verified Agent Response"}</span>
                       <button
                         onClick={() => handleCopy(msg.id, msg.content)}
                         className="hover:text-zinc-200 flex items-center gap-1 transition-colors"
@@ -232,7 +292,7 @@ export function AgentChatView({
                   )}
                 </div>
 
-                {/* User Solid Icon without background */}
+                {/* User Solid Icon */}
                 {msg.role === "user" && (
                   <User className="w-4 h-4 text-zinc-500 mt-1 flex-shrink-0" />
                 )}
@@ -242,14 +302,14 @@ export function AgentChatView({
             {/* Loading Indicator */}
             {isLoading && (
               <div className="flex gap-3 justify-start items-center">
-                <Bot className="w-4 h-4 text-zinc-400 flex-shrink-0 animate-pulse" />
+                <Bot className="w-4 h-4 text-cyan-400 flex-shrink-0 animate-pulse" />
                 <div className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-zinc-400 flex items-center gap-2 font-mono">
                   <div className="flex space-x-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '0ms' }} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '150ms' }} />
-                    <div className="w-1.5 h-1.5 rounded-full bg-zinc-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                    <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span>Agent processing query...</span>
+                  <span>Loop Controller: Planning step 1/5...</span>
                 </div>
               </div>
             )}
@@ -262,37 +322,45 @@ export function AgentChatView({
       {/* Input Form Bar */}
       <footer className="p-4 md:px-12 bg-[#09090b] border-t border-zinc-800/80 z-10">
         <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-2">
-          {/* Helper Tags */}
+          {/* Helper Quick Tags */}
           <div className="flex items-center gap-2 overflow-x-auto text-[11px] text-zinc-400 pb-0.5 no-scrollbar">
             <span className="text-[10px] text-zinc-600 font-mono uppercase">Quick:</span>
             <button
               type="button"
-              onClick={() => setInputPrompt("Run health check and output status report.")}
+              onClick={() => setInputPrompt("Query active real_estate_listings in Cairo with price under 500000.")}
               className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 transition-colors flex items-center gap-1 text-[11px]"
             >
-              <Activity className="w-3 h-3 text-zinc-400" />
-              Health Report
+              <Building2 className="w-3 h-3 text-cyan-400" />
+              Listings Query
             </button>
             <button
               type="button"
-              onClick={() => setInputPrompt("Query all active chat sessions and print summary.")}
+              onClick={() => setInputPrompt("Query marketing_campaigns channel Facebook performance.")}
               className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 transition-colors flex items-center gap-1 text-[11px]"
             >
-              <Terminal className="w-3 h-3 text-zinc-400" />
-              Session Summary
+              <Megaphone className="w-3 h-3 text-purple-400" />
+              Campaign Query
             </button>
             <button
               type="button"
-              onClick={() => setInputPrompt("Explain agent tools and real estate database capabilities.")}
+              onClick={() => setInputPrompt("Explain loop controller step budget and security scanner.")}
               className="px-2 py-0.5 rounded bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-300 transition-colors flex items-center gap-1 text-[11px]"
             >
-              <Sparkles className="w-3 h-3 text-zinc-400" />
-              Capabilities
+              <Sparkles className="w-3 h-3 text-amber-400" />
+              Agent Specs
             </button>
           </div>
 
           {/* Textarea Input Card */}
           <div className="relative rounded-lg bg-zinc-900 border border-zinc-800 focus-within:border-zinc-700 transition-colors">
+            {/* PII Pre-Flight Warning Banner */}
+            {piiScan.found && (
+              <div className="px-3 py-1.5 bg-amber-950/80 border-b border-amber-800/80 text-[11px] text-amber-300 flex items-center gap-1.5 font-mono">
+                <ShieldAlert className="w-3.5 h-3.5 text-amber-400 flex-shrink-0" />
+                <span>Security Utility Pre-flight Scan: {piiScan.matches.join(", ")} detected. Request will be rejected by controller (HTTP 400).</span>
+              </div>
+            )}
+
             <textarea
               ref={textareaRef}
               rows={2}
@@ -321,9 +389,9 @@ export function AgentChatView({
             </div>
           </div>
 
-          {/* Shortcut note */}
+          {/* Footer note */}
           <div className="flex items-center justify-between text-[10px] text-zinc-500 px-0.5 font-mono">
-            <span>AI Agent Studio</span>
+            <span>Agent Architecture Studio (max_steps: 5)</span>
             <span>Press Enter ↵ to send</span>
           </div>
         </form>

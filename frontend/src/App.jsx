@@ -1,6 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react"
 import { AgentSidebar } from "./components/AgentSidebar"
 import { AgentChatView } from "./components/AgentChatView"
+import { ToolRegistryDrawer } from "./components/ToolRegistryDrawer"
+import { DomainDataDrawer } from "./components/DomainDataDrawer"
+import { SessionContextViewer } from "./components/SessionContextViewer"
 import { Modal } from "./components/ui/Modal"
 import { Input } from "./components/ui/Input"
 import { Button } from "./components/ui/Button"
@@ -9,6 +12,7 @@ import {
   getSessions, 
   createSession, 
   deleteSession,
+  sendAgentMessage,
   getStoredBaseUrl,
   setStoredBaseUrl
 } from "./lib/api"
@@ -20,16 +24,21 @@ export default function App() {
   const [isLoadingSessions, setIsLoadingSessions] = useState(false)
   const [selectedSession, setSelectedSession] = useState(null)
 
-  // Chat messages per session state { [sessionId]: [ { id, role, content, timestamp } ] }
+  // Chat messages per session state { [sessionId]: [ { id, role, content, timestamp, execution_trace, ... } ] }
   const [sessionMessages, setSessionMessages] = useState({})
   const [isAgentResponding, setIsAgentResponding] = useState(false)
 
-  // Layout UI state
+  // Layout UI & Modals state
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [newSessionName, setNewSessionName] = useState("")
   const [isCreatingSession, setIsCreatingSession] = useState(false)
   const [createError, setCreateError] = useState(null)
+
+  // Inspector Drawers state
+  const [isToolsDrawerOpen, setIsToolsDrawerOpen] = useState(false)
+  const [isDataDrawerOpen, setIsDataDrawerOpen] = useState(false)
+  const [isContextViewerOpen, setIsContextViewerOpen] = useState(false)
 
   // API Settings Modal state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
@@ -76,7 +85,6 @@ export default function App() {
       const updated = await getSessions()
       if (updated.ok && Array.isArray(updated.data)) {
         setSessions(updated.data)
-        // Select the newly created session
         const created = updated.data.find(s => s.session_name === newSessionName.trim() || s.id === res.data?.id)
         if (created) setSelectedSession(created)
         else if (updated.data.length > 0) setSelectedSession(updated.data[0])
@@ -119,25 +127,23 @@ export default function App() {
 
     setIsAgentResponding(true)
 
-    // Simulate Agent Intelligence Response based on context
-    setTimeout(() => {
-      let responseText = ""
+    // Call Agent Endpoint (with fallback trace simulation)
+    const agentRes = await sendAgentMessage(sId, promptText)
+    setIsAgentResponding(false)
 
-      const lower = promptText.toLowerCase()
-      if (lower.includes("health") || lower.includes("diagnostic")) {
-        responseText = `System Health Status:\n• API Gateway: ${healthStatus.ok ? "ONLINE (200 OK)" : "OFFLINE"}\n• Latency: ${healthStatus.latency}ms\n• Session Repository: Connected\n• Active Session: ${selectedSession.session_name}`
-      } else if (lower.includes("cairo") || lower.includes("real estate") || lower.includes("property")) {
-        responseText = `Cairo Real Estate Market Analysis for session "${selectedSession.session_name}":\n\n1. New Cairo & 5th Settlement: High compound demand with average price growth of 18-24% YoY.\n2. 6th of October City: Preferred for mid-to-high residential developments with expanding infrastructure.\n3. New Administrative Capital: Commercial and corporate space demand remains robust.`
-      } else if (lower.includes("sql") || lower.includes("query") || lower.includes("database")) {
-        responseText = `Here is the SQL query for your session context:\n\n\`\`\`sql\nSELECT session_id, session_name, created_at \nFROM chat_sessions \nWHERE session_id = '${selectedSession.id}' \nORDER BY created_at DESC;\n\`\`\``
-      } else {
-        responseText = `I have received your prompt regarding "${promptText}".\n\nAs the AI Agent assigned to session **${selectedSession.session_name}**, I am ready to process your domain workflows, analyze data, and assist with backend tasks.`
-      }
-
+    if (agentRes.ok && agentRes.data) {
+      const data = agentRes.data
       const agentMsg = {
         id: `agent-${Date.now()}`,
         role: "agent",
-        content: responseText,
+        content: data.answer || "Request processed.",
+        execution_trace: data.execution_trace || [],
+        step_count: data.step_count || 1,
+        max_steps: data.max_steps || 5,
+        request_id: data.request_id,
+        tokens: data.tokens,
+        cost_usd: data.cost_usd,
+        latency_ms: data.latency_ms || agentRes.latency,
         timestamp: Date.now(),
       }
 
@@ -145,8 +151,20 @@ export default function App() {
         ...prev,
         [sId]: [...(prev[sId] || []), agentMsg]
       }))
-      setIsAgentResponding(false)
-    }, 900)
+    } else {
+      const errorMsg = {
+        id: `agent-error-${Date.now()}`,
+        role: "agent",
+        isError: true,
+        content: agentRes.error || "Agent loop error: Could not process request.",
+        timestamp: Date.now(),
+      }
+
+      setSessionMessages(prev => ({
+        ...prev,
+        [sId]: [...(prev[sId] || []), errorMsg]
+      }))
+    }
   }
 
   // Clear messages for current session
@@ -176,8 +194,8 @@ export default function App() {
   const activeMessages = selectedSession ? (sessionMessages[selectedSession.id] || []) : []
 
   return (
-    <div className="flex h-screen w-screen bg-canvas text-ink overflow-hidden font-sans antialiased selection:bg-accent-blue/30 selection:text-white">
-      {/* Agent Sidebar Component */}
+    <div className="flex h-screen w-screen bg-[#09090b] text-zinc-100 overflow-hidden font-sans antialiased selection:bg-cyan-500/30 selection:text-white">
+      {/* Agent Sidebar */}
       <AgentSidebar
         sessions={sessions}
         selectedSession={selectedSession}
@@ -189,9 +207,12 @@ export default function App() {
         isCollapsed={isSidebarCollapsed}
         setIsCollapsed={setIsSidebarCollapsed}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenToolsDrawer={() => setIsToolsDrawerOpen(true)}
+        onOpenDataDrawer={() => setIsDataDrawerOpen(true)}
+        onOpenContextViewer={() => setIsContextViewerOpen(true)}
       />
 
-      {/* Main Single Page Agent Interface Chat View */}
+      {/* Main Single Page Agent Workspace View */}
       <AgentChatView
         session={selectedSession}
         messages={activeMessages}
@@ -199,6 +220,28 @@ export default function App() {
         onClearMessages={handleClearMessages}
         isLoading={isAgentResponding}
         healthStatus={healthStatus}
+        onOpenToolsDrawer={() => setIsToolsDrawerOpen(true)}
+        onOpenDataDrawer={() => setIsDataDrawerOpen(true)}
+        onOpenContextViewer={() => setIsContextViewerOpen(true)}
+      />
+
+      {/* Tools Registry Drawer Modal */}
+      <ToolRegistryDrawer
+        isOpen={isToolsDrawerOpen}
+        onClose={() => setIsToolsDrawerOpen(false)}
+      />
+
+      {/* Domain Data Tables Explorer Modal */}
+      <DomainDataDrawer
+        isOpen={isDataDrawerOpen}
+        onClose={() => setIsDataDrawerOpen(false)}
+      />
+
+      {/* Session Context Memory Viewer Modal */}
+      <SessionContextViewer
+        isOpen={isContextViewerOpen}
+        onClose={() => setIsContextViewerOpen(false)}
+        session={selectedSession}
       />
 
       {/* Create New Session Modal */}
@@ -210,7 +253,7 @@ export default function App() {
       >
         <form onSubmit={handleCreateSessionSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-ink-muted mb-2">
+            <label className="block text-xs font-medium text-zinc-400 mb-2">
               Session Title
             </label>
             <Input
@@ -220,11 +263,11 @@ export default function App() {
               autoFocus
             />
             {createError && (
-              <p className="text-xs text-red-400 mt-2">{createError}</p>
+              <p className="text-xs text-rose-400 mt-2">{createError}</p>
             )}
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-zinc-800">
             <Button
               type="button"
               variant="ghost"
@@ -256,7 +299,7 @@ export default function App() {
       >
         <form onSubmit={handleSaveSettings} className="space-y-4">
           <div>
-            <label className="block text-xs font-medium text-ink-muted mb-2">
+            <label className="block text-xs font-medium text-zinc-400 mb-2">
               API Base Endpoint URL
             </label>
             <Input
@@ -266,7 +309,7 @@ export default function App() {
             />
           </div>
 
-          <div className="flex justify-end space-x-3 pt-4 border-t border-white/10">
+          <div className="flex justify-end space-x-3 pt-4 border-t border-zinc-800">
             <Button
               type="button"
               variant="ghost"
