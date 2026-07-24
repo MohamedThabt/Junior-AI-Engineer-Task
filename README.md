@@ -101,11 +101,15 @@ Try asking the assistant queries like:
 ```text
 .
 ├── app/
+│   ├── api/              # FastAPI route definitions (agent chat, sessions)
 │   ├── controllers/      # REST API route handlers
-│   ├── services/         # ReAct Agent loop, LLM adapter & business logic
+│   ├── agent/            # ReAct agent loop: planner, executor, loop controller,
+│   │                     #   LLM client (app/agent/llm_client.py) & LLM provider
+│   │                     #   factory (app/agent/llm_factory.py, Gemini today)
+│   ├── tools/            # LLM-callable tools (query/insert/update/delete + finalize)
 │   ├── repositories/     # SQLite Data access layer (Real Estate, Marketing, Chat Session)
 │   ├── models/           # Data schemas & validation models (Pydantic DTOs)
-│   └── utilities/        # Query filter evaluators & response formatting
+│   └── utilities/        # Structured agent logging, query filter evaluators & PII scanning
 ├── config/               # Logging, limiter & environment settings
 ├── data/                 # Data directory containing Excel source files
 │   ├── Real Estate Listings.xlsx

@@ -16,6 +16,9 @@ python-dotenv==1.2.2
 # HTTP Client
 httpx==0.28.1
 
+# LLM Providers
+google-genai==2.14.0
+
 # Excel / Data I/O
 pandas==2.2.3
 openpyxl==3.1.5
