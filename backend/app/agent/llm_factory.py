@@ -58,10 +58,14 @@ class GroqClient(LLMProviderClient):
         # to be installed unless the Groq provider is actually selected.
         from groq import Groq
 
-        # The SDK falls back to the GROQ_API_KEY env var if api_key is
-        # None — passing it explicitly keeps the key sourced from our own
-        # settings, not an ambient env var.
-        self._client = Groq(api_key=api_key or settings.groq_api_key)
+        # Build the key pool from settings; fall back to a single-key list
+        # when an explicit key is passed (e.g. in tests).
+        if api_key:
+            self._keys: list[str] = [api_key]
+        else:
+            self._keys = settings.all_groq_keys or [""]
+        self._key_index = 0
+        self._client = Groq(api_key=self._keys[0])
 
     def _build_tools(self, tools: list[dict]) -> list[dict] | None:
         if not tools:
@@ -174,26 +178,47 @@ class GroqClient(LLMProviderClient):
         usage = SimpleNamespace(prompt_tokens=0, completion_tokens=0, total_tokens=0)
         return SimpleNamespace(usage=usage, choices=[SimpleNamespace(message=message)])
 
-    def generate(self, messages: list[dict], tools: list[dict], model: str) -> Any:
-        from groq import BadRequestError
+    def _next_client(self) -> None:
+        """Rotate to the next available key, cycling round-robin."""
+        from groq import Groq
 
-        try:
-            return self._client.chat.completions.create(
-                model=model,
-                messages=self._build_messages(messages),
-                tools=self._build_tools(tools),
-                tool_choice="auto" if tools else None,
-                # Deterministic output reduces how often Llama malformats
-                # its raw function-call text (see `_recover_from_tool_use_
-                # failed`) and cuts down on near-duplicate exploratory
-                # tool calls across loop iterations.
-                temperature=0,
-            )
-        except BadRequestError as exc:
-            recovered = self._recover_from_tool_use_failed(exc)
-            if recovered is None:
+        self._key_index = (self._key_index + 1) % len(self._keys)
+        self._client = Groq(api_key=self._keys[self._key_index])
+        logger.warning(
+            "GroqClient: rotated to key index %d after rate-limit/quota error",
+            self._key_index,
+        )
+
+    def generate(self, messages: list[dict], tools: list[dict], model: str) -> Any:
+        from groq import BadRequestError, RateLimitError
+
+        # Try every key at most once before giving up.
+        last_exc: Exception | None = None
+        for _ in range(len(self._keys)):
+            try:
+                return self._client.chat.completions.create(
+                    model=model,
+                    messages=self._build_messages(messages),
+                    tools=self._build_tools(tools),
+                    tool_choice="auto" if tools else None,
+                    # Deterministic output reduces how often Llama malformats
+                    # its raw function-call text (see `_recover_from_tool_use_
+                    # failed`) and cuts down on near-duplicate exploratory
+                    # tool calls across loop iterations.
+                    temperature=0,
+                )
+            except RateLimitError as exc:
+                last_exc = exc
+                if len(self._keys) > 1:
+                    self._next_client()
+                    continue
                 raise
-            return recovered
+            except BadRequestError as exc:
+                recovered = self._recover_from_tool_use_failed(exc)
+                if recovered is None:
+                    raise
+                return recovered
+        raise last_exc  # type: ignore[misc]
 
 
 _REGISTRY: dict[str, type[LLMProviderClient]] = {

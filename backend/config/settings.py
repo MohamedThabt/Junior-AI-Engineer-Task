@@ -37,6 +37,19 @@ class Settings(BaseSettings):
     llm_provider: str = Field(default="groq", alias="LLM_PROVIDER")
     llm_model: str = Field(default="llama-3.3-70b-versatile", alias="LLM_MODEL")
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
+    # Additional Groq keys for rotation (JSON list in env: GROQ_API_KEYS=["key2","key3"])
+    groq_api_keys: list[str] = Field(default_factory=list, alias="GROQ_API_KEYS")
+
+    @property
+    def all_groq_keys(self) -> list[str]:
+        """Deduplicated list of all configured Groq keys (primary first, then extras)."""
+        seen: set[str] = set()
+        result: list[str] = []
+        for k in [self.groq_api_key, *self.groq_api_keys]:
+            if k and k not in seen:
+                seen.add(k)
+                result.append(k)
+        return result
 
     # Input-guardrail model: a smaller/faster model than LLM_MODEL, used only
     # for the pre-planner scope classification. Kept separate so the guardrail's
