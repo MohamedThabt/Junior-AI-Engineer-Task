@@ -4,6 +4,8 @@ A React application built with **Vite**, **Tailwind CSS**, **Lucide Icons**, and
 
 The frontend consumes the FastAPI backend's REST endpoints (`/api/health`, `/api/agent/chat`, `/api/sessions/`, etc.) — see [`../backend/README.md`](../backend/README.md) for how to run it, and [`../docs/agent-architecture.md`](../docs/agent-architecture.md) for the full request/response contract.
 
+🌐 **Live Demo:** [https://ai-task.tha-bet.software/](https://ai-task.tha-bet.software/)
+
 ---
 
 ## 🎨 Framer Design System Highlights

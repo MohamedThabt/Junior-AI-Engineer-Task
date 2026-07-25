@@ -10,6 +10,8 @@ LlamaIndex, AutoGen, CrewAI, or another agent framework.
 
 ## Demo
 
+🌐 **Live Demo:** [https://ai-task.tha-bet.software/](https://ai-task.tha-bet.software/)
+
 ![Demo example of running agent](assets/image.png)
 
 ## What it does
