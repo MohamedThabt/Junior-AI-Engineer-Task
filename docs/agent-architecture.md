@@ -6,6 +6,40 @@ design rules/tool inventory (last section, per request). No pre-built
 agent/tool frameworks are used anywhere in this design — everything below is
 plain Python, an LLM HTTP client, and `sqlite3`.
 
+## Agent type: ReAct-style tool-calling agent
+
+This is a **single-agent, ReAct-style** system. ReAct means **Reason + Act**:
+the LLM evaluates the user request and the results gathered so far, chooses
+an action, receives the action's result, and then evaluates again until it
+can answer.
+
+In this implementation, the cycle is:
+
+```text
+Plan:     LLM selects a data tool or `finalize`
+Act:      Executor validates and invokes the selected tool
+Observe:  Tool result is appended to the session context
+Repeat:   LLM receives that result on the next planning step
+```
+
+It is *ReAct-style*, rather than a literal implementation of the original
+ReAct prompting paper: planning and actions are represented as provider
+function calls, and the planner does not expose private chain-of-thought.
+The observable decision is only the selected tool plus its validated
+arguments.
+
+This pattern is appropriate because a request often needs database evidence
+before it can be answered. For example, to answer “Which active listings are
+in Cairo?”, the agent selects `query_real_estate`, observes the returned
+records, and then calls `finalize` with a grounded answer. It also supports
+multi-step work, such as querying a record before updating it.
+
+The loop is deliberately bounded by `MAX_STEPS` (default `5`). That prevents
+repeated tool calls from causing unbounded latency, LLM cost, or database
+work. Tool schemas, executor validation, and the separation between planner
+and database access keep an LLM decision from becoming unrestricted code
+execution.
+
 ---
 
 ## 0. Request flow — API route → Controller → Agent
