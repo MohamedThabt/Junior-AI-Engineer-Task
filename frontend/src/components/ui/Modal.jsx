@@ -1,6 +1,6 @@
 import React, { useEffect } from "react"
 import { X } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn } from "../../lib/utils"
 
 export const Modal = ({
   isOpen,
@@ -27,40 +27,45 @@ export const Modal = ({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/80 backdrop-blur-xs transition-opacity"
+        className="fixed inset-0 bg-[#0c0a09]/50 backdrop-blur-xs transition-opacity"
         onClick={onClose}
       />
 
-      {/* Modal Card */}
+      {/* Modal Container Card */}
       <div
         className={cn(
-          "relative z-10 w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-lg p-5 shadow-2xl space-y-4",
+          "relative z-10 w-full max-w-lg max-h-[85vh] bg-[#ffffff] border border-[#e7e5e4] rounded-2xl shadow-2xl flex flex-col overflow-hidden transition-all",
           className
         )}
       >
-        <div className="flex items-start justify-between">
-          <div>
+        {/* Fixed Header */}
+        <div className="flex-shrink-0 p-4 sm:p-5 border-b border-[#e7e5e4] flex items-start justify-between bg-[#ffffff] z-10">
+          <div className="pr-4">
             {title && (
-              <h3 className="text-sm font-semibold text-white tracking-tight">
+              <h3 className="font-serif text-lg sm:text-xl font-normal text-[#0c0a09] tracking-tight">
                 {title}
               </h3>
             )}
             {description && (
-              <p className="text-xs text-zinc-400 mt-0.5">{description}</p>
+              <p className="text-xs text-[#4e4e4e] mt-0.5 leading-relaxed">{description}</p>
             )}
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
+            className="p-1.5 rounded-full text-[#777169] hover:text-[#0c0a09] hover:bg-[#f0efed] transition-colors flex-shrink-0"
+            title="Close"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div>{children}</div>
+        {/* Scrollable Body */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-5">
+          {children}
+        </div>
       </div>
     </div>
   )

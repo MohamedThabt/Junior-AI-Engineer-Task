@@ -10,22 +10,22 @@ export const Input = React.forwardRef(({
   return (
     <div className="relative w-full">
       {Icon && (
-        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-zinc-500">
+        <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-[#777169]">
           <Icon className="w-4 h-4" />
         </div>
       )}
       <input
         ref={ref}
         className={cn(
-          "w-full bg-zinc-950 border border-zinc-800 text-zinc-100 placeholder:text-zinc-500 text-xs rounded-md py-2 px-3 focus:outline-none focus:border-zinc-700 transition-colors",
-          Icon && "pl-9",
-          error && "border-red-500/80 focus:border-red-500",
+          "w-full bg-[#ffffff] border border-[#d6d3d1] text-[#0c0a09] placeholder:text-[#a8a29e] text-sm rounded-md h-[44px] px-4 focus:outline-none focus:border-[#0c0a09] focus:ring-1 focus:ring-[#0c0a09] transition-all",
+          Icon && "pl-10",
+          error && "border-rose-500 focus:border-rose-600 focus:ring-rose-600",
           className
         )}
         {...props}
       />
       {error && (
-        <p className="mt-1 text-[11px] text-red-400">{error}</p>
+        <p className="mt-1 text-xs text-rose-600">{error}</p>
       )}
     </div>
   )
