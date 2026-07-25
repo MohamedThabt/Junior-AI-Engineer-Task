@@ -18,98 +18,98 @@ export function AgentExecutionTrace({ trace = [], telemetry = {}, stepCount = 0,
   if (!trace || trace.length === 0) return null
 
   return (
-    <div className="mt-3 border border-[#e7e5e4] rounded-xl bg-[#ffffff] overflow-hidden text-xs shadow-xs">
+    <div className="mt-3 border border-slate-200 rounded-2xl bg-white overflow-hidden text-xs shadow-xs">
       {/* Collapsible Header */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full px-3.5 py-2.5 flex items-center justify-between bg-[#fafafa] hover:bg-[#f0efed] text-[#4e4e4e] hover:text-[#0c0a09] transition-colors border-b border-[#e7e5e4] font-mono text-[11px]"
+        className="w-full px-4 py-3 flex items-center justify-between bg-slate-50 hover:bg-slate-100/80 text-slate-700 transition-all font-mono text-[11px]"
       >
-        <div className="flex items-center gap-2">
-          <Cpu className="w-3.5 h-3.5 text-[#292524]" />
-          <span className="font-semibold text-[#0c0a09]">Agent Execution Trace</span>
-          <span className="px-2 py-0.5 rounded-full bg-[#f0efed] text-[#0c0a09] border border-[#e7e5e4] text-[10px] font-medium">
+        <div className="flex items-center gap-2.5">
+          <Cpu className="w-4 h-4 text-slate-800" />
+          <span className="font-bold text-slate-900 font-sans">Agent Execution Trace</span>
+          <span className="px-2.5 py-0.5 rounded-full bg-slate-200/70 text-slate-800 border border-slate-300/50 text-[10px] font-semibold">
             {stepCount || trace.length}/{maxSteps} Steps
           </span>
         </div>
 
         <div className="flex items-center gap-3">
           {telemetry.cost_usd !== undefined && (
-            <span className="hidden sm:inline-block text-[10px] text-emerald-700 font-semibold">
+            <span className="hidden sm:inline-block text-[10px] text-emerald-700 font-semibold font-mono bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
               ${telemetry.cost_usd} USD
             </span>
           )}
           {telemetry.latency_ms && (
-            <span className="hidden sm:inline-block text-[10px] text-[#777169] flex items-center gap-1">
-              <Clock className="w-3 h-3 text-[#777169]" />
+            <span className="hidden sm:inline-block text-[10px] text-slate-500 font-mono flex items-center gap-1">
+              <Clock className="w-3 h-3 text-slate-400" />
               {telemetry.latency_ms}ms
             </span>
           )}
           {isOpen ? (
-            <ChevronDown className="w-3.5 h-3.5 text-[#777169]" />
+            <ChevronDown className="w-4 h-4 text-slate-500" />
           ) : (
-            <ChevronRight className="w-3.5 h-3.5 text-[#777169]" />
+            <ChevronRight className="w-4 h-4 text-slate-500" />
           )}
         </div>
       </button>
 
       {/* Expanded Content */}
       {isOpen && (
-        <div className="p-4 space-y-3 bg-[#f5f5f5]">
+        <div className="p-4 space-y-3.5 bg-slate-50/60 border-t border-slate-200 font-sans">
           {/* Telemetry Summary Bar */}
           {telemetry && (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 rounded-xl bg-[#ffffff] border border-[#e7e5e4] text-[10px] font-mono text-[#4e4e4e]">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 rounded-xl bg-white border border-slate-200 text-[11px] font-mono text-slate-600 shadow-2xs">
               <div>
-                <span className="text-[#777169] block">Request ID:</span>
-                <span className="text-[#0c0a09] font-medium">{telemetry.request_id || "N/A"}</span>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">Request ID:</span>
+                <span className="text-slate-900 font-medium">{telemetry.request_id || "N/A"}</span>
               </div>
               <div>
-                <span className="text-[#777169] block">Tokens (In/Out/Total):</span>
-                <span className="text-[#0c0a09]">
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">Tokens (In/Out/Total):</span>
+                <span className="text-slate-900 font-medium">
                   {telemetry.tokens?.prompt_tokens || 0} / {telemetry.tokens?.completion_tokens || 0} / {telemetry.tokens?.total_tokens || 0}
                 </span>
               </div>
               <div>
-                <span className="text-[#777169] block">Calculated Cost:</span>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">Calculated Cost:</span>
                 <span className="text-emerald-700 font-semibold">${telemetry.cost_usd || 0} USD</span>
               </div>
               <div>
-                <span className="text-[#777169] block">Total Latency:</span>
-                <span className="text-[#0c0a09] font-medium">{telemetry.latency_ms || 0}ms</span>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">Total Latency:</span>
+                <span className="text-slate-900 font-medium">{telemetry.latency_ms || 0}ms</span>
               </div>
             </div>
           )}
 
           {/* Timeline of Steps */}
-          <div className="space-y-2.5">
+          <div className="space-y-3">
             {trace.map((stepItem, idx) => (
-              <div key={idx} className="p-3.5 rounded-xl bg-[#ffffff] border border-[#e7e5e4] space-y-2 shadow-xs">
+              <div key={idx} className="p-4 rounded-xl bg-white border border-slate-200 space-y-2.5 shadow-2xs">
                 {/* Step Header */}
                 <div className="flex items-center justify-between font-mono text-[11px]">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-full bg-[#292524] text-white font-semibold text-[10px]">
+                    <span className="px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-bold text-[10px]">
                       Step {stepItem.step}
                     </span>
-                    <span className="font-semibold text-[#0c0a09] flex items-center gap-1.5">
-                      <Terminal className="w-3.5 h-3.5 text-[#292524]" />
-                      Tool: <code className="text-[#0c0a09] font-bold bg-[#f0efed] px-1.5 py-0.5 rounded">{stepItem.tool}</code>
+                    <span className="font-semibold text-slate-900 flex items-center gap-1.5 font-sans">
+                      <Terminal className="w-3.5 h-3.5 text-slate-700" />
+                      Tool: <code className="text-slate-900 font-bold bg-slate-100 px-2 py-0.5 rounded font-mono border border-slate-200">{stepItem.tool}</code>
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2 text-[10px]">
-                    <span className="text-[#777169]">{stepItem.latency_ms}ms</span>
-                    <span className="text-[#777169]">({stepItem.attempts || 1}/2 retries)</span>
+                  <div className="flex items-center gap-2.5 text-[10px] font-mono">
+                    <span className="text-slate-500">{stepItem.latency_ms}ms</span>
+                    <span className="text-slate-400">({stepItem.attempts || 1}/2 retries)</span>
                     {stepItem.status === "success" ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     ) : (
-                      <AlertCircle className="w-3.5 h-3.5 text-rose-600" />
+                      <AlertCircle className="w-4 h-4 text-rose-600" />
                     )}
                   </div>
                 </div>
 
                 {/* Planner Logic */}
                 {stepItem.planner && (
-                  <div className="text-[11px] text-[#4e4e4e] leading-relaxed pl-3 border-l-2 border-[#292524] py-0.5 bg-[#fafafa] rounded-r">
-                    <span className="text-[10px] text-[#0c0a09] font-mono font-semibold uppercase block">
+                  <div className="text-xs text-slate-700 leading-relaxed pl-3.5 border-l-2 border-slate-900 py-1 bg-slate-50 rounded-r-lg font-sans">
+                    <span className="text-[10px] text-slate-500 font-mono font-bold uppercase block mb-0.5">
                       Planner Decision:
                     </span>
                     {stepItem.planner}
@@ -118,12 +118,12 @@ export function AgentExecutionTrace({ trace = [], telemetry = {}, stepCount = 0,
 
                 {/* Executor Arguments */}
                 {stepItem.args && (
-                  <div className="bg-[#fafafa] p-2.5 rounded-lg border border-[#e7e5e4] font-mono text-[10px]">
-                    <div className="text-[#777169] mb-1 flex items-center justify-between">
+                  <div className="bg-slate-900 text-slate-200 p-3 rounded-xl border border-slate-800 font-mono text-[11px]">
+                    <div className="text-slate-400 mb-1 flex items-center justify-between text-[10px] uppercase font-bold">
                       <span>Executor Dispatch Args:</span>
-                      <ShieldCheck className="w-3 h-3 text-emerald-600" />
+                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                     </div>
-                    <pre className="text-[#0c0a09] overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                    <pre className="overflow-x-auto whitespace-pre-wrap leading-relaxed text-emerald-300">
                       {JSON.stringify(stepItem.args, null, 2)}
                     </pre>
                   </div>

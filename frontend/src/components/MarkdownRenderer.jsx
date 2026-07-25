@@ -27,17 +27,17 @@ export function MarkdownRenderer({ content = "", isUser = false }) {
   }
 
   return (
-    <div className={`space-y-2 text-xs sm:text-[13px] leading-relaxed ${isUser ? "text-[#0c0a09] font-normal" : "text-[#0c0a09]"}`}>
+    <div className={`space-y-2 text-xs sm:text-sm leading-relaxed ${isUser ? "text-slate-100 font-normal" : "text-slate-900 font-sans"}`}>
       {parts.map((part, pIdx) => {
         if (part.type === "codeblock") {
           return (
-            <div key={pIdx} className="my-2.5 rounded-xl bg-[#fafafa] border border-[#e7e5e4] overflow-hidden font-mono shadow-xs">
+            <div key={pIdx} className="my-3 rounded-xl bg-slate-900 border border-slate-800 overflow-hidden font-mono shadow-xs text-slate-100">
               {part.language && (
-                <div className="px-3 py-1 bg-[#f0efed] border-b border-[#e7e5e4] text-[10px] text-[#777169] uppercase tracking-wider font-semibold">
+                <div className="px-3 py-1 bg-slate-800 border-b border-slate-700 text-[10px] text-slate-400 uppercase tracking-wider font-semibold">
                   {part.language}
                 </div>
               )}
-              <pre className="p-3.5 text-[11px] text-[#0c0a09] overflow-x-auto whitespace-pre leading-relaxed">
+              <pre className="p-3.5 text-[11px] text-emerald-400 overflow-x-auto whitespace-pre leading-relaxed">
                 <code>{part.value}</code>
               </pre>
             </div>
@@ -55,17 +55,17 @@ export function MarkdownRenderer({ content = "", isUser = false }) {
           if (currentList.length > 0) {
             if (listType === "ul") {
               elements.push(
-                <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1 my-1.5 pl-1 ${isUser ? "text-[#0c0a09]" : "text-[#4e4e4e]"}`}>
+                <ul key={`ul-${elements.length}`} className={`list-disc list-inside space-y-1.5 my-2 pl-1 ${isUser ? "text-slate-200" : "text-slate-700"}`}>
                   {currentList.map((li, lIdx) => (
-                    <li key={lIdx}>{formatInline(li, isUser)}</li>
+                    <li key={lIdx} className="leading-relaxed">{formatInline(li, isUser)}</li>
                   ))}
                 </ul>
               )
             } else if (listType === "ol") {
               elements.push(
-                <ol key={`ol-${elements.length}`} className={`list-decimal list-inside space-y-1 my-1.5 pl-1 ${isUser ? "text-[#0c0a09]" : "text-[#4e4e4e]"}`}>
+                <ol key={`ol-${elements.length}`} className={`list-decimal list-inside space-y-1.5 my-2 pl-1 ${isUser ? "text-slate-200" : "text-slate-700"}`}>
                   {currentList.map((li, lIdx) => (
-                    <li key={lIdx}>{formatInline(li, isUser)}</li>
+                    <li key={lIdx} className="leading-relaxed">{formatInline(li, isUser)}</li>
                   ))}
                 </ol>
               )
@@ -80,20 +80,20 @@ export function MarkdownRenderer({ content = "", isUser = false }) {
             const headerRow = tableRows[0]
             const bodyRows = tableRows.slice(1).filter(r => !r.every(c => /^[-:\s]+$/.test(c)))
             elements.push(
-              <div key={`table-${elements.length}`} className="my-3 overflow-x-auto rounded-xl border border-[#e7e5e4] bg-[#ffffff]">
-                <table className="w-full text-left font-mono text-[11px] divide-y divide-[#e7e5e4]">
-                  <thead className="bg-[#f0efed] text-[#0c0a09]">
+              <div key={`table-${elements.length}`} className="my-3 overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-2xs">
+                <table className="w-full text-left font-sans text-xs divide-y divide-slate-200">
+                  <thead className="bg-slate-100/80 text-slate-900 font-semibold">
                     <tr>
                       {headerRow.map((cell, cIdx) => (
-                        <th key={cIdx} className="px-3 py-2 font-semibold">{formatInline(cell, isUser)}</th>
+                        <th key={cIdx} className="px-3.5 py-2">{formatInline(cell, isUser)}</th>
                       ))}
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[#f0efed] text-[#4e4e4e]">
+                  <tbody className="divide-y divide-slate-100 text-slate-700 font-mono text-[11px]">
                     {bodyRows.map((row, rIdx) => (
-                      <tr key={rIdx} className="hover:bg-[#fafafa]">
+                      <tr key={rIdx} className="hover:bg-slate-50/80 transition-colors">
                         {row.map((cell, cIdx) => (
-                          <td key={cIdx} className="px-3 py-2">{formatInline(cell, isUser)}</td>
+                          <td key={cIdx} className="px-3.5 py-2">{formatInline(cell, isUser)}</td>
                         ))}
                       </tr>
                     ))}
@@ -146,19 +146,19 @@ export function MarkdownRenderer({ content = "", isUser = false }) {
 
           // Headings
           if (trimmed.startsWith("### ")) {
-            elements.push(<h4 key={`h3-${i}`} className={`font-serif text-sm font-semibold mt-2 mb-1 ${isUser ? "text-[#0c0a09]" : "text-[#0c0a09]"}`}>{formatInline(trimmed.slice(4), isUser)}</h4>)
+            elements.push(<h4 key={`h3-${i}`} className={`font-sans text-sm font-bold mt-2.5 mb-1 ${isUser ? "text-white" : "text-slate-900"}`}>{formatInline(trimmed.slice(4), isUser)}</h4>)
           } else if (trimmed.startsWith("## ")) {
-            elements.push(<h3 key={`h2-${i}`} className="font-serif text-base font-normal text-[#0c0a09] mt-3 mb-1">{formatInline(trimmed.slice(3), isUser)}</h3>)
+            elements.push(<h3 key={`h2-${i}`} className={`font-sans text-base font-extrabold mt-3 mb-1.5 ${isUser ? "text-white" : "text-slate-900"}`}>{formatInline(trimmed.slice(3), isUser)}</h3>)
           } else if (trimmed.startsWith("# ")) {
-            elements.push(<h2 key={`h1-${i}`} className="font-serif text-lg font-light text-[#0c0a09] mt-3 mb-1">{formatInline(trimmed.slice(2), isUser)}</h2>)
+            elements.push(<h2 key={`h1-${i}`} className={`font-sans text-lg font-extrabold mt-3.5 mb-1.5 ${isUser ? "text-white" : "text-slate-900"}`}>{formatInline(trimmed.slice(2), isUser)}</h2>)
           } else if (trimmed.startsWith("> ")) {
             elements.push(
-              <blockquote key={`bq-${i}`} className={`border-l-2 border-[#292524] pl-3 py-1 my-2 italic bg-[#fafafa] rounded-r text-[#4e4e4e]`}>
+              <blockquote key={`bq-${i}`} className={`border-l-3 border-slate-900 pl-3 py-1 my-2 bg-slate-100/70 rounded-r text-slate-800 font-sans`}>
                 {formatInline(trimmed.slice(2), isUser)}
               </blockquote>
             )
           } else {
-            elements.push(<p key={`p-${i}`} className="my-1 leading-relaxed">{formatInline(line, isUser)}</p>)
+            elements.push(<p key={`p-${i}`} className="my-1.5 leading-relaxed">{formatInline(line, isUser)}</p>)
           }
         }
 
@@ -185,7 +185,11 @@ function formatInline(text = "", isUser = false) {
       return (
         <code 
           key={index} 
-          className="px-1.5 py-0.5 mx-0.5 rounded-md font-mono text-[11px] bg-[#f0efed] border border-[#e7e5e4] text-[#0c0a09] font-medium"
+          className={`px-1.5 py-0.5 mx-0.5 rounded-md font-mono text-[11px] font-medium ${
+            isUser
+              ? "bg-slate-800 border border-slate-700 text-emerald-300"
+              : "bg-slate-100 border border-slate-200 text-slate-900"
+          }`}
         >
           {part.slice(1, -1)}
         </code>
@@ -215,14 +219,14 @@ function formatInline(text = "", isUser = false) {
       if ((trimmedToken.startsWith("**") && trimmedToken.endsWith("**")) || 
           (trimmedToken.startsWith("__") && trimmedToken.endsWith("__"))) {
         formatted.push(
-          <strong key={match.index} className="font-semibold text-[#0c0a09]">
+          <strong key={match.index} className={`font-semibold ${isUser ? "text-white" : "text-slate-900"}`}>
             {trimmedToken.slice(2, -2)}
           </strong>
         )
       } else if ((trimmedToken.startsWith("*") && trimmedToken.endsWith("*")) ||
                  (trimmedToken.startsWith("_") && trimmedToken.endsWith("_"))) {
         formatted.push(
-          <em key={match.index} className="italic text-[#4e4e4e]">
+          <em key={match.index} className={`italic ${isUser ? "text-slate-300" : "text-slate-600"}`}>
             {trimmedToken.slice(1, -1)}
           </em>
         )

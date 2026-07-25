@@ -1,6 +1,6 @@
 import React, { useState } from "react"
 import { 
-  BrainCircuit, 
+  DatabaseZap, 
   Plus, 
   Trash2, 
   MessageSquare, 
@@ -38,70 +38,70 @@ export function AgentSidebar({
 
   return (
     <aside 
-      className={`relative flex flex-col h-full min-h-0 bg-[#f5f5f5] border-r border-[#e7e5e4] transition-all duration-200 z-20 flex-shrink-0 ${
+      className={`relative flex flex-col h-full min-h-0 bg-slate-50 border-r border-slate-200 transition-all duration-200 z-20 flex-shrink-0 font-sans ${
         isCollapsed ? "w-14" : "w-64 xl:w-72"
       }`}
     >
       {/* Sidebar Header */}
-      <div className="h-12 px-3 border-b border-[#e7e5e4] flex items-center justify-between flex-shrink-0 bg-[#ffffff]">
+      <div className="h-[56px] px-3.5 border-b border-slate-200 flex items-center justify-between flex-shrink-0 bg-white">
         {!isCollapsed ? (
-          <div className="flex items-center space-x-2">
-            <div className="w-5.5 h-5.5 rounded-lg bg-gradient-to-br from-[#292524] to-[#0c0a09] flex items-center justify-center text-white">
-              <BrainCircuit className="w-3 h-3 text-emerald-400" />
+          <div className="flex items-center space-x-2.5">
+            <div className="w-6.5 h-6.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shadow-2xs">
+              <DatabaseZap className="w-3.5 h-3.5 text-emerald-400" />
             </div>
-            <span className="font-serif text-xs font-semibold text-[#0c0a09]">
+            <span className="font-bold text-xs text-slate-900 tracking-tight">
               Workspace Sessions
             </span>
           </div>
         ) : (
           <div className="mx-auto">
-            <div className="w-5.5 h-5.5 rounded-lg bg-gradient-to-br from-[#292524] to-[#0c0a09] flex items-center justify-center text-white">
-              <BrainCircuit className="w-3 h-3 text-emerald-400" />
+            <div className="w-6.5 h-6.5 rounded-lg bg-slate-900 border border-slate-800 flex items-center justify-center text-emerald-400 shadow-2xs">
+              <DatabaseZap className="w-3.5 h-3.5 text-emerald-400" />
             </div>
           </div>
         )}
 
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
-          className="p-1 rounded-full text-[#777169] hover:text-[#0c0a09] hover:bg-[#f0efed] transition-colors"
+          className="p-1.5 rounded-lg text-slate-500 hover:text-slate-900 hover:bg-slate-100 transition-colors"
           title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          {isCollapsed ? <ChevronRight className="w-3.5 h-3.5" /> : <ChevronLeft className="w-3.5 h-3.5" />}
+          {isCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
       </div>
 
       {!isCollapsed && (
         <>
           {/* New Session CTA */}
-          <div className="p-3 border-b border-[#e7e5e4] bg-[#ffffff] flex-shrink-0">
+          <div className="p-3 border-b border-slate-200 bg-white flex-shrink-0">
             <button
               onClick={onOpenCreateSession}
-              className="w-full text-xs font-medium text-white bg-[#292524] hover:bg-[#0c0a09] py-2 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-2xs"
+              className="w-full text-xs font-semibold text-white bg-slate-900 hover:bg-slate-800 active:scale-98 py-2.5 rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
             >
-              <Plus className="w-3.5 h-3.5 text-white" />
+              <Plus className="w-4 h-4 text-white" />
               <span>New Session</span>
             </button>
           </div>
 
           {/* Search Box */}
-          <div className="p-3 border-b border-[#e7e5e4] flex-shrink-0">
+          <div className="p-3 border-b border-slate-200 flex-shrink-0">
             <div className="relative">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-[#777169]" />
+              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
                 type="text"
                 placeholder="Search sessions..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full bg-[#ffffff] text-[#0c0a09] text-xs pl-8 pr-3 py-1.5 rounded-xl border border-[#e7e5e4] focus:outline-none focus:border-[#0c0a09]"
+                className="w-full bg-white text-slate-900 text-xs pl-8 pr-3 py-1.5 rounded-xl border border-slate-200 focus:outline-none focus:border-slate-900 transition-all font-sans"
               />
             </div>
           </div>
 
           {/* Sessions List */}
-          <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1">
+          <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-1.5">
             {filteredSessions.length === 0 ? (
-              <div className="py-8 text-center text-xs text-[#777169]">
-                No sessions found
+              <div className="py-12 text-center text-xs text-slate-400 font-sans">
+                No active sessions
               </div>
             ) : (
               filteredSessions.map((session) => {
@@ -112,17 +112,17 @@ export function AgentSidebar({
                   <div
                     key={sId}
                     onClick={() => onSelectSession(session)}
-                    className={`group relative p-2.5 rounded-xl transition-all cursor-pointer flex items-center justify-between text-xs ${
+                    className={`group relative p-3 rounded-xl transition-all cursor-pointer flex items-center justify-between text-xs font-sans ${
                       isSelected
-                        ? "bg-[#ffffff] text-[#0c0a09] font-medium border border-[#e7e5e4] shadow-2xs"
-                        : "text-[#4e4e4e] hover:bg-[#ffffff] hover:text-[#0c0a09]"
+                        ? "bg-white text-slate-900 font-semibold border border-slate-200 shadow-sm"
+                        : "text-slate-600 hover:bg-white hover:text-slate-900"
                     }`}
                   >
-                    <div className="flex items-center space-x-2 min-w-0 pr-2">
-                      <MessageSquare className="w-3.5 h-3.5 flex-shrink-0 text-[#777169]" />
+                    <div className="flex items-center space-x-2.5 min-w-0 pr-2">
+                      <MessageSquare className={`w-4 h-4 flex-shrink-0 ${isSelected ? "text-emerald-600" : "text-slate-400"}`} />
                       <div className="truncate">
-                        <div className="truncate font-normal text-xs">{session.session_name}</div>
-                        <div className="text-[10px] text-[#777169] font-mono">
+                        <div className="truncate text-xs font-medium">{session.session_name}</div>
+                        <div className="text-[10px] text-slate-400 font-mono">
                           {formatDate(session.created_at)}
                         </div>
                       </div>
@@ -133,7 +133,7 @@ export function AgentSidebar({
                         e.stopPropagation()
                         onDeleteSession(sId)
                       }}
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-[#f0efed] text-[#777169] hover:text-rose-600 transition-opacity"
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-rose-600 transition-all"
                       title="Delete session"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
@@ -145,31 +145,31 @@ export function AgentSidebar({
           </div>
 
           {/* Minimal Footer Triggers */}
-          <div className="p-3 border-t border-[#e7e5e4] bg-[#ffffff] flex items-center justify-around text-xs text-[#777169] flex-shrink-0">
+          <div className="p-3 border-t border-slate-200 bg-white flex items-center justify-around text-xs text-slate-500 flex-shrink-0">
             <button 
               onClick={onOpenEvalSuite} 
-              className="hover:text-[#0c0a09] transition-colors p-1"
+              className="hover:text-slate-900 hover:bg-slate-100 p-2 rounded-lg transition-all"
               title="Eval Suite"
             >
               <FlaskConical className="w-4 h-4 text-purple-600" />
             </button>
             <button 
               onClick={onOpenToolRegistry} 
-              className="hover:text-[#0c0a09] transition-colors p-1"
+              className="hover:text-slate-900 hover:bg-slate-100 p-2 rounded-lg transition-all"
               title="Tools & Specs"
             >
               <Wrench className="w-4 h-4 text-blue-600" />
             </button>
             <button 
               onClick={onOpenContextViewer} 
-              className="hover:text-[#0c0a09] transition-colors p-1"
+              className="hover:text-slate-900 hover:bg-slate-100 p-2 rounded-lg transition-all"
               title="DB Context Memory"
             >
-              <Cpu className="w-4 h-4 text-[#292524]" />
+              <Cpu className="w-4 h-4 text-slate-800" />
             </button>
             <button 
               onClick={onOpenSettings} 
-              className="hover:text-[#0c0a09] transition-colors p-1"
+              className="hover:text-slate-900 hover:bg-slate-100 p-2 rounded-lg transition-all"
               title="API Settings"
             >
               <SlidersHorizontal className="w-4 h-4" />

@@ -83,15 +83,14 @@ export default function App() {
         loadSessionHistory(first.id || first.session_id)
       }
     } else {
-      // Create default workspace session if none exist
-      const defaultSession = {
-        id: "eval-session-01",
-        session_id: "eval-session-01",
-        session_name: "Agent Benchmark Evaluation Workspace",
-        created_at: new Date().toISOString()
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setSessions(res.data)
+        if (!selectedSession) {
+          setSelectedSession(res.data[0])
+        }
+      } else {
+        setSessions([])
       }
-      setSessions([defaultSession])
-      setSelectedSession(defaultSession)
     }
     return res
   }, [selectedSession, loadSessionHistory])
@@ -127,17 +126,7 @@ export default function App() {
       setSessions(prev => [newSess, ...prev.filter(s => s.id !== newSess.id)])
       setSelectedSession(newSess)
     } else {
-      // Local fallback creation if backend offline
-      const newLoc = {
-        id: `sess-${Date.now()}`,
-        session_id: `sess-${Date.now()}`,
-        session_name: newSessionName.trim(),
-        created_at: new Date().toISOString()
-      }
-      setSessions(prev => [newLoc, ...prev])
-      setSelectedSession(newLoc)
-      setNewSessionName("")
-      setIsCreateModalOpen(false)
+      setCreateError(res.error || "Could not connect to FastAPI server to create session.")
     }
   }
 
@@ -156,16 +145,22 @@ export default function App() {
   const handleSendMessage = async (promptText) => {
     let currentSession = selectedSession
 
-    // Ensure session exists
+    // Ensure session exists via API call
     if (!currentSession) {
-      currentSession = {
-        id: `sess-${Date.now()}`,
-        session_id: `sess-${Date.now()}`,
-        session_name: "Agent Benchmark Session",
-        created_at: new Date().toISOString()
+      const createRes = await createSession("New Session")
+      if (createRes.ok && createRes.data) {
+        currentSession = {
+          id: createRes.data.id || createRes.data.session_id,
+          session_id: createRes.data.session_id || createRes.data.id,
+          session_name: createRes.data.session_name,
+          created_at: new Date().toISOString()
+        }
+        setSessions(prev => [currentSession, ...prev])
+        setSelectedSession(currentSession)
+      } else {
+        alert("Cannot send message: FastAPI backend is offline or returned an error.")
+        return
       }
-      setSessions(prev => [currentSession, ...prev])
-      setSelectedSession(currentSession)
     }
 
     if (!promptText.trim()) return

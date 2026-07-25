@@ -45,7 +45,7 @@ export const Modal = ({
         <div className="flex-shrink-0 p-4 sm:p-5 border-b border-[#e7e5e4] flex items-start justify-between bg-[#ffffff] z-10">
           <div className="pr-4">
             {title && (
-              <h3 className="font-serif text-lg sm:text-xl font-normal text-[#0c0a09] tracking-tight">
+              <h3 className="font-sans text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
                 {title}
               </h3>
             )}

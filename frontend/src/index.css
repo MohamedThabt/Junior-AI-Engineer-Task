@@ -8,26 +8,27 @@
   }
   
   body {
-    background-color: #f5f5f5;
-    color: #0c0a09;
+    background-color: #f8fafc;
+    color: #0f172a;
+    font-family: 'Plus Jakarta Sans', 'Inter', system-ui, -apple-system, sans-serif;
     font-feature-settings: 'cv01' 1, 'cv05' 1, 'cv09' 1, 'cv11' 1, 'ss03' 1, 'ss07' 1, 'dlig' 1, 'tnum' 1;
     -webkit-font-smoothing: antialiased;
   }
 
-  /* Minimal custom scrollbar for Light Mode */
+  /* Minimal custom scrollbar */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: #d6d3d1;
+    background: #cbd5e1;
     border-radius: 9999px;
   }
   ::-webkit-scrollbar-thumb:hover {
-    background: #a8a29e;
+    background: #94a3b8;
   }
 }
 
@@ -39,36 +40,49 @@
   scrollbar-width: none;
 }
 
-/* Data Assistant Atmospheric Gradient Orbs */
+/* Glassmorphism & Modern Card Effects */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+.glass-card {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.02), 0 1px 2px -1px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease-in-out;
+}
+
+.glass-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.03);
+}
+
+/* Agent Avatar Pulsing Glow */
+.agent-avatar-glow {
+  box-shadow: 0 0 15px rgba(16, 185, 129, 0.25);
+}
+
+/* User Message Styling */
+.user-bubble {
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+}
+
+/* Agent Message Styling */
+.agent-bubble {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+}
+
+/* Atmospheric Glow Orbs */
 .orb-mint {
-  background: radial-gradient(circle at center, rgba(167, 229, 211, 0.45) 0%, rgba(167, 229, 211, 0.1) 50%, transparent 70%);
-}
-
-.orb-peach {
-  background: radial-gradient(circle at center, rgba(244, 197, 168, 0.45) 0%, rgba(244, 197, 168, 0.1) 50%, transparent 70%);
-}
-
-.orb-lavender {
-  background: radial-gradient(circle at center, rgba(200, 184, 224, 0.45) 0%, rgba(200, 184, 224, 0.1) 50%, transparent 70%);
-}
-
-.orb-sky {
-  background: radial-gradient(circle at center, rgba(168, 200, 232, 0.45) 0%, rgba(168, 200, 232, 0.1) 50%, transparent 70%);
-}
-
-.orb-rose {
-  background: radial-gradient(circle at center, rgba(232, 184, 196, 0.45) 0%, rgba(232, 184, 196, 0.1) 50%, transparent 70%);
+  background: radial-gradient(circle at center, rgba(16, 185, 129, 0.15) 0%, rgba(16, 185, 129, 0.03) 50%, transparent 70%);
 }
 
 .orb-hero-bloom {
-  background: radial-gradient(ellipse at 50% 30%, rgba(244, 197, 168, 0.35) 0%, rgba(167, 229, 211, 0.25) 35%, rgba(200, 184, 224, 0.2) 60%, transparent 80%);
-}
-
-.card-soft-drop {
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-}
-
-.editorial-serif {
-  font-family: 'EB Garamond', 'Waldenburg Light', serif;
-  font-weight: 300;
+  background: radial-gradient(ellipse at 50% 30%, rgba(99, 102, 241, 0.08) 0%, rgba(16, 185, 129, 0.06) 35%, rgba(14, 165, 233, 0.05) 60%, transparent 80%);
 }

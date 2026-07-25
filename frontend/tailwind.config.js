@@ -81,9 +81,10 @@ export default {
         'full': '9999px',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
-        serif: ['EB Garamond', 'Waldenburg Light', 'Times New Roman', 'serif'],
-        display: ['EB Garamond', 'Waldenburg Light', 'serif'],
+        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', '-apple-system', 'sans-serif'],
+        serif: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+        display: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       spacing: {
         'xxs': '4px',

@@ -366,7 +366,7 @@ export function EvaluationSuiteModal({ isOpen, onClose, onSelectPrompt }) {
                   <span className={`inline-block px-2 py-0.5 rounded-md text-[10px] font-mono border font-semibold mb-1 ${item.badgeColor}`}>
                     {item.id} • {item.category}
                   </span>
-                  <h4 className="font-serif text-sm font-normal text-[#0c0a09]">
+                  <h4 className="font-sans text-sm font-bold text-slate-900">
                     {item.title}
                   </h4>
                 </div>
