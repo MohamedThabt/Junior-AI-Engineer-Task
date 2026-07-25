@@ -114,7 +114,7 @@ flowchart TD
     LOAD --> MILE["Log session-start/resume milestone"]
     MILE --> GUARD["Input Guardrail<br/>LLM scope check (GUARDRAIL_MODEL)<br/>log guardrail_check event"]
     GUARD -->|out of scope| GREJECT["Append refusal (user's language)<br/>as assistant answer"]
-    GUARD -->|in scope / disabled / judge error (fail open)| INIT["Loop Controller<br/>reset loop_iteration_count = 0<br/>max_loop_iterations = MAX_LOOP_ITERATIONS (.env, default 5)"]
+    GUARD -->|"in scope / disabled / judge error (fail open)"| INIT["Loop Controller<br/>reset loop_iteration_count = 0<br/>max_loop_iterations = MAX_LOOP_ITERATIONS (.env, default 5)"]
     GREJECT --> COMPACT
     INIT --> LOOP["Loop iteration<br/>Increment loop_iteration_count"]
     LOOP --> WIN["Memory: prepare_context<br/>window recent turns, summarize older,<br/>digest oversized tool data"]
