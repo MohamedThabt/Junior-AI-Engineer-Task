@@ -97,9 +97,9 @@ specified in detail in [`docs/agent-architecture.md`](docs/agent-architecture.md
    `app/utilities/security.py` scans for PII/secrets — rejected requests
    never reach the LLM.
 4. **Agent loop**: `loop_controller.run()` loads session context, then
-   repeatedly calls the planner (one LLM call per step) and dispatches the
-   chosen tool via the executor, until `finalize` is called or `MAX_STEPS`
-   is hit.
+   repeatedly calls the planner (one LLM call per loop iteration) and
+   dispatches the chosen tool via the executor, until `finalize` is called or
+   `MAX_LOOP_ITERATIONS` is hit.
 5. **Tools → repositories → SQLite**: every data tool validates input, then
    delegates the actual query to a repository method; tools never touch SQL
    directly.

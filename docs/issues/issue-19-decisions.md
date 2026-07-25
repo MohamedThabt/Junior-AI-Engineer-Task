@@ -15,7 +15,7 @@ Fill in `DECISIONS.md` with the four explicit architectural decisions called out
 
 ### Decision 2 — Row limits on read tools
 - **Decision:** `query_listings` and `query_campaigns` cap returned rows at **50** server-side, regardless of what the LLM requests.
-- **Why:** an unbounded query result dumped into the LLM context is the single biggest avoidable source of slow, expensive next-step calls. 50 rows covers all realistic single-request use cases.
+- **Why:** an unbounded query result dumped into the LLM context is the single biggest avoidable source of slow, expensive next-loop-iteration calls. 50 rows covers all realistic single-request use cases.
 
 ### Decision 3 — Write-scope safety
 - **Decision:** `update_*` and `delete_*` tools accept only an exact primary key (`listing_id` / `campaign_id`). Filter-based bulk mutations are not supported.
@@ -23,4 +23,4 @@ Fill in `DECISIONS.md` with the four explicit architectural decisions called out
 
 ### Decision 4 — Per-call timeout
 - **Decision:** each tool's repository call is wrapped with a **5-second timeout**. A timeout counts as a failure and triggers the normal retry/error path.
-- **Why:** a hung DB call (lock contention, etc.) must not block the entire loop indefinitely. 5 s is generous for local SQLite while still bounding worst-case latency per step.
+- **Why:** a hung DB call (lock contention, etc.) must not block the entire loop indefinitely. 5 s is generous for local SQLite while still bounding worst-case latency per loop iteration.

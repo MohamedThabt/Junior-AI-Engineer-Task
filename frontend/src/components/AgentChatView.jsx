@@ -294,7 +294,7 @@ export function AgentChatView({
           </div>
 
           <div className="flex items-center justify-between text-[10px] text-slate-500 px-1 font-mono">
-            <span>MAX_STEPS = 5 • 50-row query cap</span>
+            <span>MAX_LOOP_ITERATIONS = 5 • 50-row query cap</span>
             <span>Press Enter ↵ to send</span>
           </div>
         </form>

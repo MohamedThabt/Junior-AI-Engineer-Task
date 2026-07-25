@@ -102,7 +102,7 @@ LLM_PROVIDER=groq
 GROQ_API_KEY=your_groq_api_key
 ```
 
-`MAX_STEPS`, `TOOL_TIMEOUT_SECONDS`, the model name, and logging level are also
+`MAX_LOOP_ITERATIONS`, `TOOL_TIMEOUT_SECONDS`, the model name, and logging level are also
 configured in this file. See [`backend/.env.example`](backend/.env.example) for
 the complete list.
 

@@ -74,7 +74,7 @@ def test_call_llm_success_returns_parsed_response_with_cost(monkeypatch, logged_
         messages=[{"role": "user", "content": "hi"}],
         tools=[],
         model="llama-3.3-70b-versatile",
-        step_number=1,
+        loop_iteration=1,
         request_id="req-1",
     )
 
@@ -106,7 +106,7 @@ def test_call_llm_retries_then_succeeds(monkeypatch, logged_calls):
         messages=[{"role": "user", "content": "hi"}],
         tools=[],
         model="llama-3.3-70b-versatile",
-        step_number=1,
+        loop_iteration=1,
     )
 
     assert response is not None
@@ -126,7 +126,7 @@ def test_call_llm_raises_llm_call_error_after_exhausting_retries(monkeypatch, lo
             messages=[{"role": "user", "content": "hi"}],
             tools=[],
             model="llama-3.3-70b-versatile",
-            step_number=1,
+            loop_iteration=1,
         )
 
     assert fake_client.calls == 3
@@ -143,7 +143,7 @@ def test_call_llm_uses_zero_cost_for_unknown_model_pricing(monkeypatch, logged_c
         messages=[{"role": "user", "content": "hi"}],
         tools=[],
         model="some-unpriced-model",
-        step_number=1,
+        loop_iteration=1,
     )
 
     assert logged_calls[0]["cost_usd"] == 0.0

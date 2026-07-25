@@ -6,14 +6,14 @@ This module owns two responsibilities that used to be smeared across
 1. **Entry vocabulary** — the canonical builders for every kind of history
    entry (`user`, assistant `tool_calls`, `tool` result, assistant answer).
    Every entry is provider-native (OpenAI/Groq message shape) with a `meta`
-   sidecar carrying our own bookkeeping (`request_id`, `step`, per-tool
-   `success`/`error`/`attempts`/`latency_ms`). The `meta` mirror is what lets
-   callers answer "which tools ran, which failed, which succeeded" without
-   re-parsing the JSON `content`.
+   sidecar carrying our own bookkeeping (`request_id`, `loop_iteration`,
+   per-tool `success`/`error`/`attempts`/`latency_ms`). The `meta` mirror is
+   what lets callers answer "which tools ran, which failed, which succeeded"
+   without re-parsing the JSON `content`.
 
 2. **Working- vs long-term-memory shaping**:
-   - `prepare_context` builds what is *sent to the LLM* this step — the most
-     recent `MEMORY_WINDOW_TURNS` entries verbatim, older ones collapsed into
+   - `prepare_context` builds what is *sent to the LLM* this loop iteration —
+     the most recent `MEMORY_WINDOW_TURNS` entries verbatim, older ones collapsed into
      a single summary recap, and oversized tool-result payloads digested.
    - `compact_for_persist` builds what is *stored* — the full conversational
      thread and per-tool audit metadata are kept, but heavy row payloads are
@@ -50,10 +50,10 @@ def _now_iso() -> str:
 # ---------------------------------------------------------------------------
 
 
-def make_call_id(request_id: str, step: int) -> str:
+def make_call_id(request_id: str, loop_iteration: int) -> str:
     """Deterministic id linking an assistant `tool_calls` turn to its `tool`
     result. Deterministic (not a UUID) so tests can assert on it."""
-    return f"call_{request_id}_{step}"
+    return f"call_{request_id}_{loop_iteration}"
 
 
 def user_entry(text: str, request_id: str) -> dict:
@@ -64,7 +64,7 @@ def user_entry(text: str, request_id: str) -> dict:
     }
 
 
-def tool_call_entry(call_id: str, tool_name: str, args: dict, request_id: str, step: int) -> dict:
+def tool_call_entry(call_id: str, tool_name: str, args: dict, request_id: str, loop_iteration: int) -> dict:
     return {
         "role": "assistant",
         "content": None,
@@ -78,14 +78,14 @@ def tool_call_entry(call_id: str, tool_name: str, args: dict, request_id: str, s
         "meta": {
             "type": TYPE_TOOL_CALL,
             "request_id": request_id,
-            "step": step,
+            "loop_iteration": loop_iteration,
             "tool": tool_name,
             "ts": _now_iso(),
         },
     }
 
 
-def tool_result_entry(call_id: str, result: Any, request_id: str, step: int, latency_ms: float | None = None) -> dict:
+def tool_result_entry(call_id: str, result: Any, request_id: str, loop_iteration: int, latency_ms: float | None = None) -> dict:
     """Build the paired `tool` entry for a `ToolResult`. `result` is duck-typed
     (anything with `.tool`/`.success`/`.error`/`.attempts` and `.model_dump()`)."""
     envelope = result.model_dump() if hasattr(result, "model_dump") else dict(result)
@@ -96,7 +96,7 @@ def tool_result_entry(call_id: str, result: Any, request_id: str, step: int, lat
         "meta": {
             "type": TYPE_TOOL_RESULT,
             "request_id": request_id,
-            "step": step,
+            "loop_iteration": loop_iteration,
             "tool": getattr(result, "tool", envelope.get("tool")),
             "success": getattr(result, "success", envelope.get("success")),
             "error": getattr(result, "error", envelope.get("error")),
@@ -217,7 +217,7 @@ def _maybe_digest_tool_entry(entry: dict, max_chars: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Windowing (what the LLM sees this step)
+# Windowing (what the LLM sees this loop iteration)
 # ---------------------------------------------------------------------------
 
 

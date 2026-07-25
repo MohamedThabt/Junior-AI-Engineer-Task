@@ -8,11 +8,11 @@ Implement `app/agent/executor.py` per `docs/agent-architecture.md` §2.2.
 
 ## Deliverables
 
-### `dispatch(tool_name: str, args: dict, step_number: int) -> ToolResult`
+### `dispatch(tool_name: str, args: dict, loop_iteration: int) -> ToolResult`
 1. Look up `tool_name` in `TOOL_REGISTRY` — if not found, return `ToolResult(success=False, error="Unknown tool: {tool_name}", tool=tool_name, attempts=0, data=None)` immediately.
 2. Validate `args` against the tool's Pydantic input model — if validation fails, return a structured error immediately (repository never called).
 3. Call the tool callable; capture start/end time.
-4. Call `log_tool_call(...)` with: tool name, args (sensitive fields redacted), step number, latency, outcome.
+4. Call `log_tool_call(...)` with: tool name, args (sensitive fields redacted), loop iteration, latency, outcome.
 5. Return the tool's `ToolResult` directly.
 
 ## Rules

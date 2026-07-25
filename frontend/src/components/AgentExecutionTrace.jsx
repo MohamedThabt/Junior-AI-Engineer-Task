@@ -12,7 +12,7 @@ import {
   Database
 } from "lucide-react"
 
-export function AgentExecutionTrace({ trace = [], telemetry = {}, stepCount = 0, maxSteps = 5 }) {
+export function AgentExecutionTrace({ trace = [], telemetry = {}, loopIterationCount = 0, maxLoopIterations = 5 }) {
   const [isOpen, setIsOpen] = useState(false)
 
   if (!trace || trace.length === 0) return null
@@ -28,7 +28,7 @@ export function AgentExecutionTrace({ trace = [], telemetry = {}, stepCount = 0,
           <Cpu className="w-4 h-4 text-slate-800" />
           <span className="font-bold text-slate-900 font-sans">Agent Execution Trace</span>
           <span className="px-2.5 py-0.5 rounded-full bg-slate-200/70 text-slate-800 border border-slate-300/50 text-[10px] font-semibold">
-            {stepCount || trace.length}/{maxSteps} Steps
+            {loopIterationCount || trace.length}/{maxLoopIterations} Loop Iterations
           </span>
         </div>
 
@@ -79,26 +79,26 @@ export function AgentExecutionTrace({ trace = [], telemetry = {}, stepCount = 0,
             </div>
           )}
 
-          {/* Timeline of Steps */}
+          {/* Timeline of Loop Iterations */}
           <div className="space-y-3">
-            {trace.map((stepItem, idx) => (
+            {trace.map((loopIterationItem, idx) => (
               <div key={idx} className="p-4 rounded-xl bg-white border border-slate-200 space-y-2.5 shadow-2xs">
-                {/* Step Header */}
+                {/* Loop Iteration Header */}
                 <div className="flex items-center justify-between font-mono text-[11px]">
                   <div className="flex items-center gap-2">
                     <span className="px-2.5 py-0.5 rounded-md bg-slate-900 text-white font-bold text-[10px]">
-                      Step {stepItem.step}
+                      Loop iteration {loopIterationItem.loop_iteration}
                     </span>
                     <span className="font-semibold text-slate-900 flex items-center gap-1.5 font-sans">
                       <Terminal className="w-3.5 h-3.5 text-slate-700" />
-                      Tool: <code className="text-slate-900 font-bold bg-slate-100 px-2 py-0.5 rounded font-mono border border-slate-200">{stepItem.tool}</code>
+                      Tool: <code className="text-slate-900 font-bold bg-slate-100 px-2 py-0.5 rounded font-mono border border-slate-200">{loopIterationItem.tool}</code>
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2.5 text-[10px] font-mono">
-                    <span className="text-slate-500">{stepItem.latency_ms}ms</span>
-                    <span className="text-slate-400">({stepItem.attempts || 1}/2 retries)</span>
-                    {stepItem.status === "success" ? (
+                    <span className="text-slate-500">{loopIterationItem.latency_ms}ms</span>
+                    <span className="text-slate-400">({loopIterationItem.attempts || 1}/2 retries)</span>
+                    {loopIterationItem.status === "success" ? (
                       <CheckCircle2 className="w-4 h-4 text-emerald-600" />
                     ) : (
                       <AlertCircle className="w-4 h-4 text-rose-600" />
@@ -107,24 +107,24 @@ export function AgentExecutionTrace({ trace = [], telemetry = {}, stepCount = 0,
                 </div>
 
                 {/* Planner Logic */}
-                {stepItem.planner && (
+                {loopIterationItem.planner && (
                   <div className="text-xs text-slate-700 leading-relaxed pl-3.5 border-l-2 border-slate-900 py-1 bg-slate-50 rounded-r-lg font-sans">
                     <span className="text-[10px] text-slate-500 font-mono font-bold uppercase block mb-0.5">
                       Planner Decision:
                     </span>
-                    {stepItem.planner}
+                    {loopIterationItem.planner}
                   </div>
                 )}
 
                 {/* Executor Arguments */}
-                {stepItem.args && (
+                {loopIterationItem.args && (
                   <div className="bg-slate-900 text-slate-200 p-3 rounded-xl border border-slate-800 font-mono text-[11px]">
                     <div className="text-slate-400 mb-1 flex items-center justify-between text-[10px] uppercase font-bold">
                       <span>Executor Dispatch Args:</span>
                       <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                     </div>
                     <pre className="overflow-x-auto whitespace-pre-wrap leading-relaxed text-emerald-300">
-                      {JSON.stringify(stepItem.args, null, 2)}
+                      {JSON.stringify(loopIterationItem.args, null, 2)}
                     </pre>
                   </div>
                 )}

@@ -17,7 +17,7 @@ and 1,000 marketing campaigns `CMP-8001`–`CMP-9000`) produced by
 
 The agent exposes exactly **8 data tools + 1 control tool** (see
 `app/tools/registry.py`). It has **no other data sources** and a hard budget of
-`MAX_STEPS` tool-call steps per request (default **5**, see
+`MAX_LOOP_ITERATIONS` tool-call loop iterations per request (default **5**, see
 `config/settings.py`).
 
 | Tool | Purpose | Hard constraints |
@@ -273,7 +273,7 @@ the tools/data I have" via `finalize` — **never** an invented result.
 
 ---
 
-## Category F — Multi-step & budget pressure (optional, harder)
+## Category F — Multi-loop-iteration & budget pressure (optional, harder)
 
 ### F1. Two-table request within budget
 - **Prompt:** "How many Google Ads campaigns are there, and how many active
@@ -282,16 +282,16 @@ the tools/data I have" via `finalize` — **never** an invented result.
   `query_real_estate state=Washington status=Active`) then combine.
 - **Ground truth:** 246 Google Ads campaigns (capped at 50 rows returned — see
   the cap caveat), Washington active listings from the seed.
-- **Watch for:** stays within the 5-step budget; is honest that the 246 count
+- **Watch for:** stays within the 5-loop-iteration budget; is honest that the 246 count
   can't be confirmed from a 50-row read.
 
-### F2. Step-budget exhaustion
+### F2. Loop-iteration-budget exhaustion
 - **Prompt:** "Go through every single listing one at a time and tell me the
   grand total list price across all 1,000 of them."
-- **Why hard:** impossible within 5 steps and the 50-row cap.
+- **Why hard:** impossible within 5 loop iterations and the 50-row cap.
 - **Expected:** Agent recognizes it can't enumerate all 1,000 rows with the
   available tools/budget and says so — rather than hitting the forced-finalize
-  step limit with a fabricated total. (If it does hit `max_steps`, the loop
+  loop iteration limit with a fabricated total. (If it does hit `max_loop_iterations`, the loop
   returns the partial "here is what I found so far" summary; a well-behaved
   agent avoids that by declining up front.)
 

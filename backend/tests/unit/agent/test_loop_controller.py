@@ -26,7 +26,7 @@ def _fakeSuccessfulToolResult(tool_name="query_real_estate"):
 
 
 class TestNormalFinalizePath:
-    def test_llm_calls_finalize_on_step_two_persists_context_and_returns_answer(
+    def test_llm_calls_finalize_on_loop_iteration_two_persists_context_and_returns_answer(
         self, db_conn, monkeypatch
     ):
         decisions = [
@@ -72,8 +72,8 @@ class TestNormalFinalizePath:
 
 
 class TestForcedFinalize:
-    def test_exits_at_max_steps_when_llm_never_calls_finalize(self, db_conn, monkeypatch):
-        monkeypatch.setattr(settings, "max_steps", 2)
+    def test_exits_at_max_loop_iterations_when_llm_never_calls_finalize(self, db_conn, monkeypatch):
+        monkeypatch.setattr(settings, "max_loop_iterations", 2)
         planCallCount = {"value": 0}
 
         def _countingPlan(*_args, **_kwargs):
@@ -90,7 +90,7 @@ class TestForcedFinalize:
         answer, sessionId = run(None, "Show listings in Austin", "req-forced")
 
         assert planCallCount["value"] == 2
-        assert "step limit" in answer
+        assert "loop iteration limit" in answer
 
 
 class TestExceptionHandling:

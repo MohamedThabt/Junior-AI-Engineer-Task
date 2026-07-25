@@ -78,7 +78,7 @@ def call_llm(
     messages: list[dict],
     tools: list[dict],
     model: str,
-    step_number: int,
+    loop_iteration: int,
     request_id: str | None = None,
 ) -> LLMResponse:
     rid = request_id or request_id_var.get("")
@@ -107,7 +107,7 @@ def call_llm(
             )
             log_llm_call(
                 request_id=rid,
-                step_number=step_number,
+                loop_iteration=loop_iteration,
                 model=model,
                 prompt_tokens=response.prompt_tokens if response else 0,
                 completion_tokens=response.completion_tokens if response else 0,

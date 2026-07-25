@@ -14,7 +14,7 @@ class Settings(BaseSettings):
 
     # Agent loop — read from the environment (unprefixed), not hardcoded, so
     # the loop controller's budget can change without a code change.
-    max_steps: int = Field(default=5, alias="MAX_STEPS")
+    max_loop_iterations: int = Field(default=5, alias="MAX_LOOP_ITERATIONS")
 
     # Per-call SQLite busy-timeout (seconds) used by the repository layer so
     # a hung/locked DB call fails fast instead of blocking the tool retry

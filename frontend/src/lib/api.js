@@ -137,8 +137,8 @@ export function parseBackendContext(contextList) {
       }
 
       currentTrace.push({
-        step: meta.step || currentTrace.length + 1,
-        planner: `Dispatching \`${toolName}\` to execute agent step ${meta.step || currentTrace.length + 1}.`,
+        loop_iteration: meta.loop_iteration || currentTrace.length + 1,
+        planner: `Dispatching \`${toolName}\` to execute agent loop iteration ${meta.loop_iteration || currentTrace.length + 1}.`,
         tool: toolName,
         args: toolArgs,
         attempts: 1,
@@ -155,7 +155,7 @@ export function parseBackendContext(contextList) {
       }
 
       const callId = entry.tool_call_id
-      const traceItem = currentTrace.find(t => t.call_id === callId || t.step === meta.step)
+      const traceItem = currentTrace.find(t => t.call_id === callId || t.loop_iteration === meta.loop_iteration)
 
       if (traceItem) {
         traceItem.status = meta.success !== false && payload.success !== false ? "success" : "failed"
@@ -164,7 +164,7 @@ export function parseBackendContext(contextList) {
         traceItem.result = payload
       } else {
         currentTrace.push({
-          step: meta.step || currentTrace.length + 1,
+          loop_iteration: meta.loop_iteration || currentTrace.length + 1,
           tool: meta.tool || payload.tool || "tool",
           args: {},
           attempts: meta.attempts || payload.attempts || 1,
@@ -179,8 +179,8 @@ export function parseBackendContext(contextList) {
         role: "agent",
         content: entry.content || "",
         execution_trace: [...currentTrace],
-        step_count: currentTrace.length,
-        max_steps: 5,
+        loop_iteration_count: currentTrace.length,
+        max_loop_iterations: 5,
         request_id: reqId,
         timestamp
       })

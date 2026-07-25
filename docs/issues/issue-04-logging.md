@@ -16,7 +16,7 @@ Implement the JSON logging foundation per `docs/agent-architecture.md` §3.
 
 ### `log_llm_call(...)` — one JSON line, fields per §3
 ```
-request_id, step_number, model,
+request_id, loop_iteration, model,
 prompt_tokens, completion_tokens, total_tokens,
 latency_ms, cost_usd, attempt_number,
 success (bool), error (str|null), timestamp
@@ -24,7 +24,7 @@ success (bool), error (str|null), timestamp
 
 ### `log_tool_call(...)` — one JSON line, fields per §3
 ```
-request_id, step_number, tool_name,
+request_id, loop_iteration, tool_name,
 args (redact sensitive fields),
 attempt_number, latency_ms,
 success (bool), error (str|null), timestamp

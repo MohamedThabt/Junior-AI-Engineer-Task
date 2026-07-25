@@ -21,7 +21,8 @@ Act:      Executor validates and invokes the selected tool
 Observe:  The assistant's tool-call decision (tool + args) AND the tool
           result are both appended to the session context, linked by a
           shared call_id
-Repeat:   The LLM receives that call→result pair on the next planning step
+Repeat:   The LLM receives that call→result pair on the next planning loop
+          iteration
 ```
 
 It is *ReAct-style*, rather than a literal implementation of the original
@@ -40,9 +41,9 @@ This pattern is appropriate because a request often needs database evidence
 before it can be answered. For example, to answer “Which active listings are
 in Cairo?”, the agent selects `query_real_estate`, observes the returned
 records, and then calls `finalize` with a grounded answer. It also supports
-multi-step work, such as querying a record before updating it.
+multi-loop-iteration work, such as querying a record before updating it.
 
-The loop is deliberately bounded by `MAX_STEPS` (default `5`). That prevents
+The loop is deliberately bounded by `MAX_LOOP_ITERATIONS` (default `5`). That prevents
 repeated tool calls from causing unbounded latency, LLM cost, or database
 work. Tool schemas, executor validation, and the separation between planner
 and database access keep an LLM decision from becoming unrestricted code
@@ -106,9 +107,9 @@ flowchart TD
     SEC -->|match found| REJECT["Reject request (400)<br/>log security event"]
     SEC -->|clean| LOAD["Load session context + version from DB<br/>(ChatSessionRepository)"]
     LOAD --> MILE["Log session-start/resume milestone"]
-    MILE --> INIT["Loop Controller<br/>reset step_count = 0<br/>max_steps = MAX_STEPS (.env, default 5)"]
-    INIT --> STEP[Increment step_count]
-    STEP --> WIN["Memory: prepare_context<br/>window recent turns, summarize older,<br/>digest oversized tool data"]
+    MILE --> INIT["Loop Controller<br/>reset loop_iteration_count = 0<br/>max_loop_iterations = MAX_LOOP_ITERATIONS (.env, default 5)"]
+    INIT --> LOOP["Loop iteration<br/>Increment loop_iteration_count"]
+    LOOP --> WIN["Memory: prepare_context<br/>window recent turns, summarize older,<br/>digest oversized tool data"]
     WIN --> PLAN["Planner: LLM Call<br/>system prompt + tool schemas + windowed context"]
     PLAN -->|LLM call throws| LLMERR["LLM Call Wrapper<br/>catch, retry x2, log"]
     LLMERR -->|still failing| FALLBACK[Graceful Fallback Node]
@@ -123,8 +124,8 @@ flowchart TD
     RESULT --> APPEND["Append tool result to context<br/>(role=tool, tool_call_id + audit meta)"]
     TOOLERR1 --> APPEND
     TOOLERR2 --> APPEND
-    APPEND --> CHECK{step_count >= max_steps?}
-    CHECK -->|No| STEP
+    APPEND --> CHECK{loop_iteration_count >= max_loop_iterations?}
+    CHECK -->|No| LOOP
     CHECK -->|Yes| FORCED["Forced Finalize<br/>best-effort answer from THIS request's<br/>gathered context only"]
     FIN --> COMPACT["Memory: compact_for_persist<br/>keep thread + audit meta, digest heavy payloads"]
     FORCED --> COMPACT
@@ -135,20 +136,21 @@ flowchart TD
 ```
 
 Key rules encoded in this diagram:
-- **`step_count` resets to 0 on every new incoming user request** — it is not
-  cumulative across a conversation, only within the current request's
-  planner/tool loop.
-- **`max_steps` defaults to 5**, read from `.env` (`MAX_STEPS`), configurable
-  without a code change, but not exposed to the LLM as something it can
-  change.
+- **`loop_iteration_count` resets to 0 on every new incoming user request** —
+  it is not cumulative across a conversation, only within the current
+  request's planner/tool loop.
+- **`max_loop_iterations` defaults to 5**, read from `.env`
+  (`MAX_LOOP_ITERATIONS`), configurable without a code change, but not
+  exposed to the LLM as something it can change.
 - The loop only exits three ways: (a) LLM calls the `finalize` tool, (b)
-  `step_count` hits `max_steps` → forced finalize, (c) an unrecoverable
-  exception → graceful fallback. There is no other exit path.
+  `loop_iteration_count` hits `max_loop_iterations` → forced finalize, (c) an
+  unrecoverable exception → graceful fallback. There is no other exit path.
 - Session context is **loaded from the DB at the start of the request** and
   **persisted back at the end** (finalize, forced finalize, or fallback) —
   the loop never holds a session's memory only in process memory across
-  requests. What is *sent to the LLM* each step is a windowed/summarized view
-  of that context (short-term working memory + a recap of older turns); what is
+  requests. What is *sent to the LLM* each loop iteration is a
+  windowed/summarized view of that context (short-term working memory + a
+  recap of older turns); what is
   *stored* is the full conversational thread with heavy payloads digested (see
   2.6).
 - **Every write is version-guarded** (optimistic concurrency): the context's
@@ -160,7 +162,7 @@ Key rules encoded in this diagram:
 ## 2. Agent components & business logic
 
 ### 2.1 Planner (`backend/app/agent/planner.py`)
-- Responsibility: single LLM call per step. Input = system prompt + tool
+- Responsibility: single LLM call per loop iteration. Input = system prompt + tool
   schemas + running context (prior tool calls/results this request, plus
   compacted history from earlier requests). Output = either a tool call (name +
   args) or a call to `finalize`.
@@ -184,31 +186,33 @@ Key rules encoded in this diagram:
   call anything) — this is a dispatcher-level failure, separate from a
   tool-level failure.
 - Logs every dispatch: tool name, args (with any obviously sensitive fields
-  redacted), step number, latency, outcome.
+  redacted), loop iteration, latency, outcome.
 
 ### 2.3 Loop Controller (`backend/app/agent/loop_controller.py`)
-- Responsibility: owns `step_count` and `max_steps` for the current request,
-  drives the step→plan→dispatch→append cycle, and decides when to stop.
-- `max_steps` is read from the environment at startup (`MAX_STEPS` in `.env`,
-  default `5`) via `backend/config/settings.py` — never hardcoded in the loop
-  controller itself.
+- Responsibility: owns `loop_iteration_count` and `max_loop_iterations` for
+  the current request, drives the loop-iteration→plan→dispatch→append cycle,
+  and decides when to stop.
+- `max_loop_iterations` is read from the environment at startup
+  (`MAX_LOOP_ITERATIONS` in `.env`, default `5`) via
+  `backend/config/settings.py` — never hardcoded in the loop controller
+  itself.
 - At the **start** of a request: resolve the `session_id` (create a new
   session via `SessionRepository` if none was supplied), load that session's
   stored `context` **and its `version`** from the DB, and log the
-  session-start/resume milestone (see section 3). `step_count = 0` for this
-  request regardless of how much prior context exists — the step budget is
-  per-request, the context is per-session.
+  session-start/resume milestone (see section 3). `loop_iteration_count = 0`
+  for this request regardless of how much prior context exists — the loop
+  iteration budget is per-request, the context is per-session.
 - **Before each planner call**, the loop controller runs the context through
   `memory.prepare_context` (2.6) to produce the bounded, windowed message list
   the planner sends to the LLM.
-- **On each data-tool step**, the loop controller appends the assistant's
-  tool-call decision (tool name + args + a `call_id`) to context *before*
-  dispatching, then appends the paired tool result (`role="tool"`,
+- **On each data-tool loop iteration**, the loop controller appends the
+  assistant's tool-call decision (tool name + args + a `call_id`) to context
+  *before* dispatching, then appends the paired tool result (`role="tool"`,
   `tool_call_id`, plus audit `meta`) after — so history records both the intent
   and the outcome, linked by `call_id`.
 - After each tool result is appended to the in-memory context: check
-  `step_count >= max_steps`. If true and the LLM has not called `finalize`,
-  the loop controller forces a finalize (see 2.4) — passing **only the current
+  `loop_iteration_count >= max_loop_iterations`. If true and the LLM has not
+  called `finalize`, the loop controller forces a finalize (see 2.4) — passing **only the current
   request's entries** (`memory.entries_for_request`), so a prior turn's results
   can never leak into the budget-exhausted summary.
 - At the **end** of a request (finalize, forced finalize, or fallback): the
@@ -228,13 +232,14 @@ Key rules encoded in this diagram:
 - `finalize` is itself exposed to the LLM as a tool (same function-calling
   mechanism as the data tools), with a single argument: the natural-language
   answer to return to the user. Calling it is how the LLM signals "I'm done."
-- **Forced finalize** (max steps reached, no `finalize` call yet): the loop
-  controller does *not* ask the LLM to try again — it constructs a best-
-  effort response from whatever **successful tool results from the current
-  request** are already in context (scoped via `memory.entries_for_request`,
-  so a prior turn's results never bleed in), or, if none are usable, a plain
-  "I wasn't able to complete this within the step budget" message, and returns
-  immediately. This guarantees the request terminates at exactly `max_steps`
+- **Forced finalize** (max loop iterations reached, no `finalize` call yet):
+  the loop controller does *not* ask the LLM to try again — it constructs a
+  best-effort response from whatever **successful tool results from the
+  current request** are already in context (scoped via
+  `memory.entries_for_request`, so a prior turn's results never bleed in), or,
+  if none are usable, a plain "I wasn't able to complete this within the loop
+  iteration budget" message, and returns immediately. This guarantees the
+  request terminates at exactly `max_loop_iterations`
   LLM calls, protecting latency.
 - **Graceful fallback** (unhandled exception anywhere in the loop): a fixed,
   user-safe message (e.g. "Something went wrong processing that request —
@@ -261,12 +266,12 @@ bookkeeping that the provider never sees (`llm_factory` strips it). Four shapes:
 | Entry | Shape (abbreviated) | `meta` carries |
 |---|---|---|
 | user | `{role:"user", content:<msg>}` | `type`, `request_id`, `ts` |
-| tool call | `{role:"assistant", content:null, tool_calls:[{id, function:{name, arguments}}]}` | `type`, `request_id`, `step`, `tool`, `ts` |
-| tool result | `{role:"tool", tool_call_id:<id>, content:<json ToolResult>}` | `type`, `request_id`, `step`, `tool`, `success`, `error`, `attempts`, `latency_ms`, `ts` |
+| tool call | `{role:"assistant", content:null, tool_calls:[{id, function:{name, arguments}}]}` | `type`, `request_id`, `loop_iteration`, `tool`, `ts` |
+| tool result | `{role:"tool", tool_call_id:<id>, content:<json ToolResult>}` | `type`, `request_id`, `loop_iteration`, `tool`, `success`, `error`, `attempts`, `latency_ms`, `ts` |
 | answer | `{role:"assistant", content:<answer>}` | `type`, `request_id`, `ts` |
 | summary (runtime only) | `{role:"assistant", content:<deterministic recap>}` | `type: "summary"` |
 
-The tool-call and tool-result entries share a `call_id` (`call_{request_id}_{step}`),
+The tool-call and tool-result entries share a `call_id` (`call_{request_id}_{loop_iteration}`),
 which is what pairs a decision to its outcome. The `meta` mirror on the tool
 result is what makes **"which tools ran, which failed, which succeeded"**
 answerable directly (e.g. by the session API or a test) without re-parsing the
@@ -281,8 +286,8 @@ provider but is not appended to or stored in the session context.
 context sent verbatim to the LLM. Under the default window this includes the
 full current request trace; if `MEMORY_WINDOW_TURNS` is configured below the
 number of entries produced by a request, its oldest entries are summarized
-too. This lets the LLM reason across dependent steps (query a record, observe
-it, then update it) without re-sending an unbounded history.
+too. This lets the LLM reason across dependent loop iterations (query a
+record, observe it, then update it) without re-sending an unbounded history.
 
 **Long-term memory** = the compacted conversational history across *earlier*
 requests: user questions, the agent's answers, and the per-tool audit `meta`,
@@ -305,7 +310,7 @@ Two pure functions bound each side:
   tool result; it does not impose a retention limit on the number of
   conversational turns stored in a session.
 
-**Why summarize/window at all.** Every planner step re-sends the context; without
+**Why summarize/window at all.** Every planner loop iteration re-sends the context; without
 a window it grows with every turn and every tool call, driving token cost and
 latency up and eventually overflowing the model's context window (which would
 surface as an `LLMCallError` → graceful fallback, silently losing the turn).
@@ -342,10 +347,11 @@ optimistic-concurrency guarded by a `version` column (migration
 
 ### 2.8 Data flow summary
 `Client → API Route → AgentController (syntax check) → Security Utility (PII
-scan) → Loop Controller (load session context + version, reset step) → [per
-step: Memory.prepare_context (window/summarize) → Planner (LLM) → record
-tool-call decision → Executor (dispatch) → Tool (validate → call Repository →
-retry) → structured result + audit meta → back into session context] → Loop
+scan) → Loop Controller (load session context + version, reset loop iteration
+count) → [per loop iteration: Memory.prepare_context (window/summarize) →
+Planner (LLM) → record tool-call decision → Executor (dispatch) → Tool
+(validate → call Repository → retry) → structured result + audit meta → back
+into session context] → Loop
 Controller decides continue/finalize → Memory.compact_for_persist → persist
 context (version-guarded, redacted) → Response`
 
@@ -366,7 +372,7 @@ Every LLM call and every tool call must produce one structured log line
 (JSON, via Python's `logging` + a JSON formatter — no external logging
 framework needed). Use a single `request_id` (generated once per incoming
 user request) threaded through every log line for that request, plus the
-current `step_number`, so a full trace of one request can be reconstructed
+current `loop_iteration`, so a full trace of one request can be reconstructed
 end-to-end from the logs.
 
 **Session-start milestone (log this distinctly, not just as a regular log
@@ -379,7 +385,7 @@ subsequent LLM/tool log line for that request should be findable by
 searching for the `request_id` first seen at this milestone.
 
 **Per LLM call, log:**
-- `request_id`, `step_number`
+- `request_id`, `loop_iteration`
 - `model` name
 - `prompt_tokens`, `completion_tokens`, `total_tokens` (from the API response)
 - `latency_ms` (wall-clock time of the call)
@@ -392,7 +398,7 @@ searching for the `request_id` first seen at this milestone.
 - timestamp
 
 **Per tool call, log:**
-- `request_id`, `step_number`, `tool_name`
+- `request_id`, `loop_iteration`, `tool_name`
 - `args` (redact if any field is sensitive — not expected here, but keep the
   hook)
 - `attempt_number` (tool's own internal retry count, 1 or 2)
@@ -455,10 +461,10 @@ You have read/insert/update/delete tools for each table (schemas provided
 separately via function-calling) and one control tool: `finalize`.
 
 ## Rules you must follow
-1. You have a maximum of {max_steps} tool-call steps for this request. Work
-   efficiently — do not call a tool to look up something you can already
-   answer from this prompt (e.g. you already know the table schemas — do
-   not ask for them).
+1. You have a maximum of {max_loop_iterations} tool-call loop iterations for
+   this request. Work efficiently — do not call a tool to look up something
+   you can already answer from this prompt (e.g. you already know the table
+   schemas — do not ask for them).
 2. When you have enough information to answer the user, call `finalize`
    with your final natural-language answer. Do not call finalize before you
    actually have the answer.
@@ -473,7 +479,7 @@ separately via function-calling) and one control tool: `finalize`.
 5. Never fabricate data. If a tool returns no results, say so plainly.
 ```
 
-`{max_steps}` is interpolated at runtime from the loop controller's
+`{max_loop_iterations}` is interpolated at runtime from the loop controller's
 configured value, so the LLM's own understanding of its budget always
 matches the actual enforced limit.
 
@@ -491,9 +497,9 @@ project_root/
 │   │   │   ├── agent_controller.py   # syntax validation + security scan -> loop controller
 │   │   │   └── session_controller.py # index/show/delete, backed by ChatSessionRepository
 │   │   ├── agent/
-│   │   │   ├── planner.py       # single LLM call per step, decision only
+│   │   │   ├── planner.py       # single LLM call per loop iteration, decision only
 │   │   │   ├── executor.py      # dispatch: tool name/args -> tool call
-│   │   │   ├── loop_controller.py # step_count, max_steps (.env), session load/save, finalize/fallback
+│   │   │   ├── loop_controller.py # loop_iteration_count, max_loop_iterations (.env), session load/save, finalize/fallback
 │   │   │   ├── finalize.py      # finalize tool + forced-finalize + fallback text
 │   │   │   ├── memory.py        # history entry builders, prompt windowing/summary, payload digestion
 │   │   │   ├── llm_client.py    # LLM HTTP wrapper: retry, logging, cost calc (provider-agnostic)
@@ -528,10 +534,10 @@ project_root/
 │   │   └── Marketing Campaigns.xlsx
 │   ├── logs/                    # JSON log output (gitignored)
 │   ├── config/
-│   │   └── settings.py          # reads .env: MAX_STEPS, MEMORY_* config, model config, pricing table
+│   │   └── settings.py          # reads .env: MAX_LOOP_ITERATIONS, MEMORY_* config, model config, pricing table
 │   ├── tests/                   # pytest suite, mirrors app/ package layout
 │   ├── main.py                  # entry point / FastAPI app
-│   ├── .env                     # MAX_STEPS, LLM API keys/config (gitignored)
+│   ├── .env                     # MAX_LOOP_ITERATIONS, LLM API keys/config (gitignored)
 │   ├── .env.example             # committed template, no real secrets
 │   ├── requirements.txt
 │   └── README.md                # backend-specific setup/run/test instructions
@@ -657,7 +663,7 @@ A few things your list doesn't explicitly cover, that matter for this task:
    cap returned rows (e.g. default/max `limit` of ~20–50) regardless of what
    the LLM asks for. Given latency is critical, an unbounded query result
    dumped back into the LLM context is one of the biggest avoidable sources
-   of slow, expensive next-step calls.
+   of slow, expensive next-loop-iteration calls.
 3. **Write-scope safety.** `update_real_estate`/`delete_real_estate` (and the
    campaign equivalents) should only ever operate on an exact primary key,
    never a filter (e.g. "delete all pending listings in Texas"). This is

@@ -6,7 +6,7 @@ from app.models.schemas import ToolResult
 
 class TestDispatchUnknownTool:
     def test_unknown_tool_name_returns_structured_error_without_invoking_anything(self):
-        result = dispatch("delete_everything", {}, step_number=1, request_id="req-1")
+        result = dispatch("delete_everything", {}, loop_iteration=1, request_id="req-1")
 
         assert result.success is False
         assert result.data is None
@@ -27,7 +27,7 @@ class TestDispatchValidationFailure:
 
         monkeypatch.setitem(executor_module.TOOL_REGISTRY, "query_real_estate", _spyTool)
 
-        result = dispatch("query_real_estate", {"min_price": 500, "max_price": 100}, step_number=1, request_id="req-1")
+        result = dispatch("query_real_estate", {"min_price": 500, "max_price": 100}, loop_iteration=1, request_id="req-1")
 
         assert result.success is False
         assert "invalid arguments" in result.error
@@ -51,7 +51,7 @@ class TestDispatchValidCall:
 
         monkeypatch.setitem(executor_module.TOOL_REGISTRY, "query_real_estate", _fakeTool)
 
-        result = dispatch("query_real_estate", {"city": "Austin"}, step_number=2, request_id="req-2")
+        result = dispatch("query_real_estate", {"city": "Austin"}, loop_iteration=2, request_id="req-2")
 
         assert result is expectedResult
 
@@ -72,11 +72,11 @@ class TestDispatchValidCall:
             ),
         )
 
-        dispatch("query_real_estate", {"city": "Austin"}, step_number=3, request_id="req-3")
+        dispatch("query_real_estate", {"city": "Austin"}, loop_iteration=3, request_id="req-3")
 
         assert len(logged) == 1
         assert logged[0]["tool_name"] == "query_real_estate"
-        assert logged[0]["step_number"] == 3
+        assert logged[0]["loop_iteration"] == 3
         assert logged[0]["request_id"] == "req-3"
         assert logged[0]["success"] is True
 
@@ -88,7 +88,7 @@ class TestDispatchValidCall:
 
         monkeypatch.setitem(executor_module.TOOL_REGISTRY, "query_real_estate", _explodingTool)
 
-        result = dispatch("query_real_estate", {"city": "Austin"}, step_number=1, request_id="req-4")
+        result = dispatch("query_real_estate", {"city": "Austin"}, loop_iteration=1, request_id="req-4")
 
         assert result.success is False
         assert "connection reset" in result.error

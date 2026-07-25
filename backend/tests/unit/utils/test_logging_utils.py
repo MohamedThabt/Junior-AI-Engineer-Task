@@ -31,7 +31,7 @@ def test_log_llm_call_writes_all_required_fields(tmp_path, monkeypatch):
 
     logging_utils.log_llm_call(
         request_id="req-1",
-        step_number=1,
+        loop_iteration=1,
         model="llama-3.3-70b-versatile",
         prompt_tokens=10,
         completion_tokens=5,
@@ -45,7 +45,7 @@ def test_log_llm_call_writes_all_required_fields(tmp_path, monkeypatch):
 
     entry = _read_json_lines(tmp_path / "app.log")[-1]
     for field in (
-        "request_id", "step_number", "model", "prompt_tokens", "completion_tokens",
+        "request_id", "loop_iteration", "model", "prompt_tokens", "completion_tokens",
         "total_tokens", "latency_ms", "cost_usd", "attempt_number", "success", "error",
         "timestamp",
     ):
@@ -58,7 +58,7 @@ def test_log_tool_call_redacts_sensitive_arg_fields(tmp_path, monkeypatch):
 
     logging_utils.log_tool_call(
         request_id="req-1",
-        step_number=1,
+        loop_iteration=1,
         tool_name="insert_listing",
         args={"city": "Austin", "api_key": "sk-should-not-appear", "password": "secret123"},
         attempt_number=1,
@@ -88,7 +88,7 @@ def test_logging_failure_does_not_raise(tmp_path, monkeypatch):
 
     logging_utils.log_tool_call(
         request_id="req-1",
-        step_number=1,
+        loop_iteration=1,
         tool_name="insert_listing",
         args={"note": Unserializable()},
         attempt_number=1,

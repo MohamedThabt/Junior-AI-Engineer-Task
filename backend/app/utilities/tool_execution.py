@@ -61,13 +61,13 @@ def format_validation_error(exc: ValidationError) -> str:
     return "; ".join(parts)
 
 
-def make_attempt_logger(tool_name: str, request_id: str, step_number: int, args: dict) -> OnAttempt:
+def make_attempt_logger(tool_name: str, request_id: str, loop_iteration: int, args: dict) -> OnAttempt:
     """Build an `on_attempt` callback that logs each retry attempt via `log_tool_call`."""
 
     def _log(attempt: int, success: bool, error: str | None, latency_ms: float) -> None:
         log_tool_call(
             request_id=request_id,
-            step_number=step_number,
+            loop_iteration=loop_iteration,
             tool_name=tool_name,
             args=args,
             attempt_number=attempt,

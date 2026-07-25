@@ -15,9 +15,9 @@ Implement `app/agent/planner.py` per `docs/agent-architecture.md` §2.1.
 {"type": "finalize", "answer": str}
 ```
 
-### `plan(system_prompt: str, context: list, tool_schemas: list, step_number: int) -> PlannerDecision`
+### `plan(system_prompt: str, context: list, tool_schemas: list, loop_iteration: int) -> PlannerDecision`
 - Builds the messages list: system prompt + context (prior tool calls/results this request) + current user message.
-- Calls `llm_client.call_llm(messages, tools=tool_schemas, model=settings.LLM_MODEL, step_number=step_number)`.
+- Calls `llm_client.call_llm(messages, tools=tool_schemas, model=settings.LLM_MODEL, loop_iteration=loop_iteration)`.
 - Parses the `LLMResponse`:
   - If the LLM returned a tool call named `finalize` → return `PlannerDecision(type="finalize", answer=args["answer"])`
   - If the LLM returned any other tool call → return `PlannerDecision(type="tool_call", tool_name=..., args=...)`

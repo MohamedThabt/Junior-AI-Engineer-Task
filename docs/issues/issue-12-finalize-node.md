@@ -14,10 +14,10 @@ Implement `app/agent/finalize.py` per `docs/agent-architecture.md` §2.4.
 - This is the normal loop-exit path.
 
 ### `forced_finalize(context: list) -> ToolResult`
-- Called by the loop controller when `step_count >= max_steps` and the LLM has NOT called `finalize`.
+- Called by the loop controller when `loop_iteration_count >= max_loop_iterations` and the LLM has NOT called `finalize`.
 - Constructs a best-effort answer from tool results already in `context`.
-- If no usable results exist: returns the fixed message `"I wasn't able to complete this within the step budget."`
-- Does **not** make another LLM call — guarantees termination at exactly `max_steps` LLM calls.
+- If no usable results exist: returns the fixed message `"I wasn't able to complete this within the loop iteration budget."`
+- Does **not** make another LLM call — guarantees termination at exactly `max_loop_iterations` LLM calls.
 
 ### `graceful_fallback() -> ToolResult`
 - Called on any unhandled exception in the loop.

@@ -1,10 +1,11 @@
 """System prompt template (`docs/agent-architecture.md` §4).
 
-`build_system_prompt(max_steps)` only interpolates `{max_steps}` into the
-module-level template — no business logic lives here. Keeping `max_steps`
-as a runtime parameter (rather than hardcoding it in the template) means the
-LLM's stated step budget always matches whatever the loop controller
-actually enforces (`config/settings.py`'s `MAX_STEPS`).
+`build_system_prompt(max_loop_iterations)` only interpolates
+`{max_loop_iterations}` into the module-level template — no business logic
+lives here. Keeping `max_loop_iterations` as a runtime parameter (rather
+than hardcoding it in the template) means the LLM's stated loop iteration
+budget always matches whatever the loop controller actually enforces
+(`config/settings.py`'s `MAX_LOOP_ITERATIONS`).
 """
 
 from __future__ import annotations
@@ -50,10 +51,10 @@ You have read/insert/update/delete tools for each table (schemas provided
 separately via function-calling) and one control tool: `finalize`.
 
 ## Rules you must follow
-1. You have a maximum of {max_steps} tool-call steps for this request. Work
-   efficiently — do not call a tool to look up something you can already
-   answer from this prompt (e.g. you already know the table schemas — do
-   not ask for them).
+1. You have a maximum of {max_loop_iterations} tool-call loop iterations
+   for this request. Work efficiently — do not call a tool to look up
+   something you can already answer from this prompt (e.g. you already know
+   the table schemas — do not ask for them).
 2. When you have enough information to answer the user, call `finalize`
    with your final natural-language answer. Do not call finalize before you
    actually have the answer.
@@ -77,6 +78,6 @@ instead of acting on it.
 """
 
 
-def build_system_prompt(max_steps: int) -> str:
-    """Return the full system prompt with `{max_steps}` interpolated."""
-    return _SYSTEM_PROMPT_TEMPLATE.format(max_steps=max_steps)
+def build_system_prompt(max_loop_iterations: int) -> str:
+    """Return the full system prompt with `{max_loop_iterations}` interpolated."""
+    return _SYSTEM_PROMPT_TEMPLATE.format(max_loop_iterations=max_loop_iterations)

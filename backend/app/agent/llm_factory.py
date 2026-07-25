@@ -164,7 +164,7 @@ class GroqClient(LLMProviderClient):
 
         logger.warning(
             "GroqClient: recovered a malformed raw function call for tool %r "
-            "from a tool_use_failed error instead of failing the step",
+            "from a tool_use_failed error instead of failing the loop iteration",
             match.group("name"),
         )
         tool_call = SimpleNamespace(
@@ -186,7 +186,7 @@ class GroqClient(LLMProviderClient):
                 # Deterministic output reduces how often Llama malformats
                 # its raw function-call text (see `_recover_from_tool_use_
                 # failed`) and cuts down on near-duplicate exploratory
-                # tool calls across steps.
+                # tool calls across loop iterations.
                 temperature=0,
             )
         except BadRequestError as exc:

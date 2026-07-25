@@ -24,7 +24,7 @@ from app.utilities.logging_utils import log_tool_call
 from app.utilities.tool_execution import format_validation_error
 
 
-def dispatch(tool_name: str, args: dict, step_number: int, request_id: str) -> ToolResult:
+def dispatch(tool_name: str, args: dict, loop_iteration: int, request_id: str) -> ToolResult:
     if tool_name not in TOOL_REGISTRY:
         return ToolResult(
             success=False,
@@ -50,12 +50,12 @@ def dispatch(tool_name: str, args: dict, step_number: int, request_id: str) -> T
     tool_fn = TOOL_REGISTRY[tool_name]
     start = time.perf_counter()
     try:
-        result = tool_fn(args, request_id=request_id, step_number=step_number)
+        result = tool_fn(args, request_id=request_id, loop_iteration=loop_iteration)
     except Exception as exc:  # tool callable raised instead of returning ToolResult
         latency_ms = (time.perf_counter() - start) * 1000
         log_tool_call(
             request_id=request_id,
-            step_number=step_number,
+            loop_iteration=loop_iteration,
             tool_name=tool_name,
             args=args,
             attempt_number=1,
@@ -77,7 +77,7 @@ def dispatch(tool_name: str, args: dict, step_number: int, request_id: str) -> T
     # redaction step needed here.
     log_tool_call(
         request_id=request_id,
-        step_number=step_number,
+        loop_iteration=loop_iteration,
         tool_name=tool_name,
         args=args,
         attempt_number=result.attempts or 1,

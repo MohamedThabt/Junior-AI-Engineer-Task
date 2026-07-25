@@ -18,7 +18,7 @@ class TestEntryBuilders:
         assert call["function"]["name"] == "query_real_estate"
         assert json.loads(call["function"]["arguments"]) == {"city": "Austin"}
         assert entry["meta"]["request_id"] == "req"
-        assert entry["meta"]["step"] == 1
+        assert entry["meta"]["loop_iteration"] == 1
 
     def test_tool_result_entry_mirrors_audit_fields_into_meta(self):
         class _R:
@@ -91,13 +91,13 @@ class TestSuccessfulToolResults:
 
 
 class TestPrepareContext:
-    def _tool_result(self, request_id, step, data):
+    def _tool_result(self, request_id, loop_iteration, data):
         envelope = {"success": True, "tool": "query_real_estate", "data": data, "error": None, "attempts": 1}
         return {
             "role": "tool",
-            "tool_call_id": f"call_{request_id}_{step}",
+            "tool_call_id": f"call_{request_id}_{loop_iteration}",
             "content": json.dumps(envelope),
-            "meta": {"type": "tool_result", "request_id": request_id, "step": step, "success": True},
+            "meta": {"type": "tool_result", "request_id": request_id, "loop_iteration": loop_iteration, "success": True},
         }
 
     def test_keeps_all_when_within_window(self):

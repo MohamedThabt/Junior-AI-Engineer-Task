@@ -32,7 +32,7 @@ MAX_QUERY_LIMIT = 50
 
 
 def query_real_estate(
-    args: dict, *, request_id: str | None = None, step_number: int = 0
+    args: dict, *, request_id: str | None = None, loop_iteration: int = 0
 ) -> ToolResult:
     """Read listings matching optional filters (`limit` capped at 50)."""
     tool_name = "query_real_estate"
@@ -59,7 +59,7 @@ def query_real_estate(
         rows, attempts = run_with_retry(
             _operation,
             max_attempts=MAX_ATTEMPTS,
-            on_attempt=make_attempt_logger(tool_name, request_id, step_number, args),
+            on_attempt=make_attempt_logger(tool_name, request_id, loop_iteration, args),
         )
     except Exception as exc:
         return ToolResult(
@@ -80,7 +80,7 @@ def query_real_estate(
 
 
 def insert_real_estate(
-    args: dict, *, request_id: str | None = None, step_number: int = 0
+    args: dict, *, request_id: str | None = None, loop_iteration: int = 0
 ) -> ToolResult:
     """Create a listing. `listing_id` is required and must not already exist."""
     tool_name = "insert_real_estate"
@@ -106,7 +106,7 @@ def insert_real_estate(
         row, attempts = run_with_retry(
             _operation,
             max_attempts=MAX_ATTEMPTS,
-            on_attempt=make_attempt_logger(tool_name, request_id, step_number, args),
+            on_attempt=make_attempt_logger(tool_name, request_id, loop_iteration, args),
         )
     except Exception as exc:
         return ToolResult(
@@ -121,7 +121,7 @@ def insert_real_estate(
 
 
 def update_real_estate(
-    args: dict, *, request_id: str | None = None, step_number: int = 0
+    args: dict, *, request_id: str | None = None, loop_iteration: int = 0
 ) -> ToolResult:
     """Update an existing listing. Targets an exact `listing_id` only, never a filter."""
     tool_name = "update_real_estate"
@@ -149,7 +149,7 @@ def update_real_estate(
         row, attempts = run_with_retry(
             _operation,
             max_attempts=MAX_ATTEMPTS,
-            on_attempt=make_attempt_logger(tool_name, request_id, step_number, args),
+            on_attempt=make_attempt_logger(tool_name, request_id, loop_iteration, args),
         )
     except Exception as exc:
         return ToolResult(
@@ -164,7 +164,7 @@ def update_real_estate(
 
 
 def delete_real_estate(
-    args: dict, *, request_id: str | None = None, step_number: int = 0
+    args: dict, *, request_id: str | None = None, loop_iteration: int = 0
 ) -> ToolResult:
     """Delete an existing listing. Targets an exact `listing_id` only, never a filter."""
     tool_name = "delete_real_estate"
@@ -191,7 +191,7 @@ def delete_real_estate(
         data, attempts = run_with_retry(
             _operation,
             max_attempts=MAX_ATTEMPTS,
-            on_attempt=make_attempt_logger(tool_name, request_id, step_number, args),
+            on_attempt=make_attempt_logger(tool_name, request_id, loop_iteration, args),
         )
     except Exception as exc:
         return ToolResult(

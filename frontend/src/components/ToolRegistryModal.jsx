@@ -72,7 +72,7 @@ export const AGENT_TOOLS = [
     name: "finalize",
     category: "Control",
     purpose: "Return the final structured answer to user",
-    constraints: "The only way the agent loop completes normally. Required within MAX_STEPS = 5.",
+    constraints: "The only way the agent loop completes normally. Required within MAX_LOOP_ITERATIONS = 5.",
     params: ["answer"]
   }
 ]
@@ -92,10 +92,10 @@ export function ToolRegistryModal({ isOpen, onClose }) {
           <div className="p-3.5 rounded-xl bg-[#fafafa] border border-[#e7e5e4] space-y-1">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-[#0c0a09]">
               <Terminal className="w-3.5 h-3.5 text-[#292524]" />
-              <span>MAX_STEPS = 5</span>
+              <span>MAX_LOOP_ITERATIONS = 5</span>
             </div>
             <p className="text-[11px] text-[#4e4e4e] leading-snug">
-              Hard loop step budget before forced finalization summary.
+              Hard loop iteration budget before forced finalization summary.
             </p>
           </div>
 

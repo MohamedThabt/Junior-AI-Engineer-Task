@@ -16,7 +16,7 @@ from app.models.schemas import ToolResult
 
 FINALIZE_TOOL_NAME = "finalize"
 
-_BUDGET_EXHAUSTED_MESSAGE = "I wasn't able to complete this within the step budget."
+_BUDGET_EXHAUSTED_MESSAGE = "I wasn't able to complete this within the loop iteration budget."
 _FALLBACK_MESSAGE = (
     "Something went wrong processing that request — please try again or rephrase it."
 )
@@ -34,9 +34,10 @@ def run_finalize(answer: str) -> ToolResult:
 
 
 def forced_finalize(context: list) -> ToolResult:
-    """Called when `step_count >= max_steps` and the LLM never called
-    `finalize`. Never makes another LLM call — this is what guarantees the
-    request terminates at exactly `max_steps` LLM calls.
+    """Called when `loop_iteration_count >= max_loop_iterations` and the LLM
+    never called `finalize`. Never makes another LLM call — this is what
+    guarantees the request terminates at exactly `max_loop_iterations` LLM
+    calls.
 
     *context* is expected to be scoped to the current request (see
     `loop_controller.run`), so the summary can never splice in a prior turn's
@@ -51,7 +52,7 @@ def forced_finalize(context: list) -> ToolResult:
             f"- {result.get('tool')}: {json.dumps(result.get('data'))}" for result in successes
         ]
         answer = (
-            "I reached my step limit before finishing, but here is what I found so far:\n"
+            "I reached my loop iteration limit before finishing, but here is what I found so far:\n"
             + "\n".join(lines)
         )
 

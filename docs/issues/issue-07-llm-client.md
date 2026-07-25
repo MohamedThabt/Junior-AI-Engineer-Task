@@ -8,7 +8,7 @@ Implement `app/agent/llm_client.py` per `docs/agent-architecture.md` §2.5. Sing
 
 ## Deliverables
 
-### `call_llm(messages: list, tools: list, model: str, step_number: int) -> LLMResponse`
+### `call_llm(messages: list, tools: list, model: str, loop_iteration: int) -> LLMResponse`
 - Makes one LLM API call with the provided messages + tool schemas (function-calling).
 - Wraps the HTTP call in `try/except`.
 - Retries transient failures (network errors, rate limits, timeouts) up to **2 times** with exponential backoff (attempts 1, 2, 3).

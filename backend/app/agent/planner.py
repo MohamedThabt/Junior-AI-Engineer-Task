@@ -1,6 +1,6 @@
 """Planner (`docs/agent-architecture.md` §2.1).
 
-One LLM call per step, decision only. Never touches the database, never
+One LLM call per loop iteration, decision only. Never touches the database, never
 contains business logic, never calls a tool directly — it only ever
 produces a `PlannerDecision` for the executor/loop controller to act on.
 Retries live entirely in `llm_client.call_llm` — `LLMCallError` propagates
@@ -28,14 +28,14 @@ class PlannerDecision:
     answer: str | None = None
 
 
-def plan(system_prompt: str, context: list, tool_schemas: list, step_number: int) -> PlannerDecision:
+def plan(system_prompt: str, context: list, tool_schemas: list, loop_iteration: int) -> PlannerDecision:
     messages = [{"role": "system", "content": system_prompt}, *context]
 
     response = call_llm(
         messages=messages,
         tools=tool_schemas,
         model=settings.llm_model,
-        step_number=step_number,
+        loop_iteration=loop_iteration,
     )
 
     if response.tool_calls:
@@ -51,6 +51,7 @@ def plan(system_prompt: str, context: list, tool_schemas: list, step_number: int
 
     # No tool call at all: the LLM answered in plain text instead of calling
     # `finalize` as instructed. Treat it as an implicit finalize rather than
-    # erroring the step, so a compliant-but-imperfect model still resolves.
+    # erroring the loop iteration, so a compliant-but-imperfect model still
+    # resolves.
     answer = response.text or "I don't have a specific answer for that."
     return PlannerDecision(type="finalize", answer=answer)

@@ -75,7 +75,7 @@ def _emit(entry: dict[str, Any]) -> None:
 def log_llm_call(
     *,
     request_id: str,
-    step_number: int,
+    loop_iteration: int,
     model: str,
     prompt_tokens: int,
     completion_tokens: int,
@@ -90,7 +90,7 @@ def log_llm_call(
         {
             "event": "llm_call",
             "request_id": request_id,
-            "step_number": step_number,
+            "loop_iteration": loop_iteration,
             "model": model,
             "prompt_tokens": prompt_tokens,
             "completion_tokens": completion_tokens,
@@ -107,7 +107,7 @@ def log_llm_call(
 def log_tool_call(
     *,
     request_id: str,
-    step_number: int,
+    loop_iteration: int,
     tool_name: str,
     args: dict[str, Any] | None,
     attempt_number: int,
@@ -119,7 +119,7 @@ def log_tool_call(
         {
             "event": "tool_call",
             "request_id": request_id,
-            "step_number": step_number,
+            "loop_iteration": loop_iteration,
             "tool_name": tool_name,
             "args": _redact(args),
             "attempt_number": attempt_number,

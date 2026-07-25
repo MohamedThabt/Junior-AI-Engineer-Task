@@ -260,34 +260,34 @@ export const EVALUATION_CASES = [
     catId: "E",
     title: "E7. Schema & capability probe",
     prompt: "What can you help me with?",
-    capability: "Rule 1: Answering capability questions without wasting tool steps",
+    capability: "Rule 1: Answering capability questions without wasting tool loop iterations",
     tools: ["finalize"],
-    expected: "Summarizes the 2 datasets and 8 data tools without burning a query tool step.",
+    expected: "Summarizes the 2 datasets and 8 data tools without burning a query tool loop iteration.",
     groundTruth: "System prompt capability self-knowledge",
     badgeColor: "bg-purple-50 text-purple-700 border-purple-200"
   },
   {
     id: "F1",
-    category: "Category F — Multi-Step & Budget Pressure",
+    category: "Category F — Multi-Loop-Iteration & Budget Pressure",
     catId: "F",
-    title: "F1. Two-table request within 5-step budget",
+    title: "F1. Two-table request within 5-loop-iteration budget",
     prompt: "How many Google Ads campaigns are there, and how many active listings are in Washington?",
-    capability: "Multi-tool dispatch within MAX_STEPS=5",
+    capability: "Multi-tool dispatch within MAX_LOOP_ITERATIONS=5",
     tools: ["query_campaigns", "query_real_estate", "finalize"],
-    expected: "Executes 2 queries sequentially and synthesizes results within step budget.",
+    expected: "Executes 2 queries sequentially and synthesizes results within loop iteration budget.",
     groundTruth: "246 Google Ads campaigns (capped subset) + WA active count",
     badgeColor: "bg-stone-100 text-stone-800 border-stone-300"
   },
   {
     id: "F2",
-    category: "Category F — Multi-Step & Budget Pressure",
+    category: "Category F — Multi-Loop-Iteration & Budget Pressure",
     catId: "F",
-    title: "F2. Step-budget exhaustion protection",
+    title: "F2. Loop-iteration-budget exhaustion protection",
     prompt: "Go through every single listing one at a time and tell me the grand total list price across all 1,000 of them.",
     capability: "Early budget exhaustion recognition",
     tools: ["finalize"],
-    expected: "Recognizes 1,000 rows cannot be enumerated one-by-one under MAX_STEPS=5 & 50-row cap, and declines up front.",
-    groundTruth: "Budget limit protection (MAX_STEPS = 5)",
+    expected: "Recognizes 1,000 rows cannot be enumerated one-by-one under MAX_LOOP_ITERATIONS=5 & 50-row cap, and declines up front.",
+    groundTruth: "Budget limit protection (MAX_LOOP_ITERATIONS = 5)",
     badgeColor: "bg-stone-100 text-stone-800 border-stone-300"
   }
 ]
@@ -303,7 +303,7 @@ export function EvaluationSuiteModal({ isOpen, onClose, onSelectPrompt }) {
     { id: "C", label: "Category C — Error Handling" },
     { id: "D", label: "Category D — Clarifications" },
     { id: "E", label: "Category E — Out of Scope" },
-    { id: "F", label: "Category F — Step Budget" },
+    { id: "F", label: "Category F — Loop Iteration Budget" },
   ]
 
   const filteredCases = EVALUATION_CASES.filter(c => {

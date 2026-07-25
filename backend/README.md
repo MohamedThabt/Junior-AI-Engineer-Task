@@ -36,7 +36,7 @@ Key variables (see `.env.example` for the full, commented list):
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `MAX_STEPS` | `5` | Max planner/tool-call steps per request before forced finalize |
+| `MAX_LOOP_ITERATIONS` | `5` | Max planner/tool-call loop iterations per request before forced finalize |
 | `TOOL_TIMEOUT_SECONDS` | `5` | SQLite busy-timeout per tool call |
 | `LLM_PROVIDER` | `groq` | Active LLM provider (registry in `app/agent/llm_factory.py`) |
 | `LLM_MODEL` | `llama-3.3-70b-versatile` | Model name passed to the provider |

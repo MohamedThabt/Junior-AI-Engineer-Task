@@ -54,7 +54,7 @@ class TestToolUseFailedRecovery:
     usable response whenever Llama's raw `<function=name>{...}</function>`
     text is malformed or fails schema validation — but the intended call is
     still readable as text in `failed_generation`. `GroqClient.generate`
-    should recover it rather than let the whole step fail."""
+    should recover it rather than let the whole loop iteration fail."""
 
     def _make_client_raising(self, error: Exception) -> GroqClient:
         client = GroqClient()

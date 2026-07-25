@@ -32,7 +32,7 @@ MAX_QUERY_LIMIT = 50
 
 
 def query_campaigns(
-    args: dict, *, request_id: str | None = None, step_number: int = 0
+    args: dict, *, request_id: str | None = None, loop_iteration: int = 0
 ) -> ToolResult:
     """Read campaigns matching optional filters (`limit` capped at 50)."""
     tool_name = "query_campaigns"
@@ -59,7 +59,7 @@ def query_campaigns(
         rows, attempts = run_with_retry(
             _operation,
             max_attempts=MAX_ATTEMPTS,
-            on_attempt=make_attempt_logger(tool_name, request_id, step_number, args),
+            on_attempt=make_attempt_logger(tool_name, request_id, loop_iteration, args),
         )
     except Exception as exc:
         return ToolResult(
@@ -80,7 +80,7 @@ def query_campaigns(
 
 
 def insert_campaign(
-    args: dict, *, request_id: str | None = None, step_number: int = 0
+    args: dict, *, request_id: str | None = None, loop_iteration: int = 0
 ) -> ToolResult:
     """Create a campaign. `campaign_id` is required and must not already exist."""
     tool_name = "insert_campaign"
@@ -106,7 +106,7 @@ def insert_campaign(
         row, attempts = run_with_retry(
             _operation,
             max_attempts=MAX_ATTEMPTS,
-            on_attempt=make_attempt_logger(tool_name, request_id, step_number, args),
+            on_attempt=make_attempt_logger(tool_name, request_id, loop_iteration, args),
         )
     except Exception as exc:
         return ToolResult(
@@ -121,7 +121,7 @@ def insert_campaign(
 
 
 def update_campaign(
-    args: dict, *, request_id: str | None = None, step_number: int = 0
+    args: dict, *, request_id: str | None = None, loop_iteration: int = 0
 ) -> ToolResult:
     """Update an existing campaign. Targets an exact `campaign_id` only, never a filter."""
     tool_name = "update_campaign"
@@ -149,7 +149,7 @@ def update_campaign(
         row, attempts = run_with_retry(
             _operation,
             max_attempts=MAX_ATTEMPTS,
-            on_attempt=make_attempt_logger(tool_name, request_id, step_number, args),
+            on_attempt=make_attempt_logger(tool_name, request_id, loop_iteration, args),
         )
     except Exception as exc:
         return ToolResult(
@@ -164,7 +164,7 @@ def update_campaign(
 
 
 def delete_campaign(
-    args: dict, *, request_id: str | None = None, step_number: int = 0
+    args: dict, *, request_id: str | None = None, loop_iteration: int = 0
 ) -> ToolResult:
     """Delete an existing campaign. Targets an exact `campaign_id` only, never a filter."""
     tool_name = "delete_campaign"
@@ -191,7 +191,7 @@ def delete_campaign(
         data, attempts = run_with_retry(
             _operation,
             max_attempts=MAX_ATTEMPTS,
-            on_attempt=make_attempt_logger(tool_name, request_id, step_number, args),
+            on_attempt=make_attempt_logger(tool_name, request_id, loop_iteration, args),
         )
     except Exception as exc:
         return ToolResult(
