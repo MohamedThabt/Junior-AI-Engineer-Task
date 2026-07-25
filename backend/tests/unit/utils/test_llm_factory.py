@@ -127,3 +127,81 @@ class TestToolUseFailedRecovery:
 
         with pytest.raises(_FakeBadRequestError):
             client.generate(messages=[], tools=[], model="llama-3.3-70b-versatile")
+
+
+class TestBuildMessages:
+    """`_build_messages` must translate our stored, meta-tagged history into
+    provider-native chat messages: preserve native tool_calls/tool pairing,
+    strip our `meta` sidecar, and downgrade unpaired legacy tool entries."""
+
+    def test_strips_meta_and_preserves_tool_call_result_pairing(self):
+        client = GroqClient()
+        history = [
+            {"role": "system", "content": "sys"},
+            {"role": "user", "content": "show austin", "meta": {"request_id": "r1"}},
+            {
+                "role": "assistant",
+                "content": None,
+                "tool_calls": [
+                    {
+                        "id": "call_r1_1",
+                        "type": "function",
+                        "function": {"name": "query_real_estate", "arguments": '{"city": "Austin"}'},
+                    }
+                ],
+                "meta": {"type": "tool_call", "request_id": "r1"},
+            },
+            {
+                "role": "tool",
+                "tool_call_id": "call_r1_1",
+                "content": '{"success": true}',
+                "meta": {"type": "tool_result", "success": True},
+            },
+            {"role": "assistant", "content": "done", "meta": {"type": "answer"}},
+        ]
+
+        built = client._build_messages(history)
+
+        # No entry leaks our internal `meta` key to the provider.
+        assert all("meta" not in message for message in built)
+
+        assistant_call = built[2]
+        assert assistant_call["role"] == "assistant"
+        assert assistant_call["tool_calls"][0]["id"] == "call_r1_1"
+
+        tool_msg = built[3]
+        assert tool_msg["role"] == "tool"
+        assert tool_msg["tool_call_id"] == "call_r1_1"
+
+    def test_downgrades_unpaired_legacy_tool_entry_to_user(self):
+        client = GroqClient()
+        history = [
+            {"role": "user", "content": "hi"},
+            # Legacy flat entry: a tool result with no tool_call_id and no
+            # preceding assistant tool_calls turn.
+            {"role": "tool", "content": '{"success": true, "tool": "query_real_estate"}'},
+        ]
+
+        built = client._build_messages(history)
+
+        assert built[1]["role"] == "user"
+        assert "query_real_estate" in built[1]["content"]
+
+    def test_downgrades_tool_result_when_its_call_turn_was_windowed_off(self):
+        client = GroqClient()
+        # A summary recap replaces the trimmed assistant call turn, so the tool
+        # result's call_id is unknown -> must become a user turn, not a bare
+        # `tool` message the provider would reject.
+        history = [
+            {"role": "assistant", "content": "Summary of earlier conversation:\n- ..."},
+            {
+                "role": "tool",
+                "tool_call_id": "call_old_1",
+                "content": '{"success": true}',
+                "meta": {"type": "tool_result"},
+            },
+        ]
+
+        built = client._build_messages(history)
+
+        assert built[1]["role"] == "user"

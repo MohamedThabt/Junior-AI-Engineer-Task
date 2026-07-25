@@ -47,11 +47,28 @@ class TestNormalFinalizePath:
 
         persistedContext = ChatSessionRepository.get_context(sessionId)
         roles = [entry["role"] for entry in persistedContext]
-        assert roles == ["user", "tool", "assistant"]
+        # user question -> assistant tool_calls decision -> tool result -> answer
+        assert roles == ["user", "assistant", "tool", "assistant"]
         assert persistedContext[0]["content"] == "Show listings in Austin"
         assert persistedContext[-1]["content"] == "Found 1 listing in Austin."
-        toolEnvelope = json.loads(persistedContext[1]["content"])
+
+        # The assistant decision turn records the tool + args, linked by call_id.
+        decisionTurn = persistedContext[1]
+        assert decisionTurn["content"] is None
+        toolCall = decisionTurn["tool_calls"][0]
+        assert toolCall["function"]["name"] == "query_real_estate"
+        assert json.loads(toolCall["function"]["arguments"]) == {"city": "Austin"}
+        callId = toolCall["id"]
+
+        # The tool result is paired to that decision and carries audit meta.
+        toolTurn = persistedContext[2]
+        assert toolTurn["tool_call_id"] == callId
+        toolEnvelope = json.loads(toolTurn["content"])
         assert toolEnvelope["tool"] == "query_real_estate"
+        assert toolTurn["meta"]["tool"] == "query_real_estate"
+        assert toolTurn["meta"]["success"] is True
+        assert toolTurn["meta"]["request_id"] == "req-normal"
+        assert toolTurn["meta"]["latency_ms"] >= 0
 
 
 class TestForcedFinalize:

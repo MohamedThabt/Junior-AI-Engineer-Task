@@ -18,8 +18,10 @@ In this implementation, the cycle is:
 ```text
 Plan:     LLM selects a data tool or `finalize`
 Act:      Executor validates and invokes the selected tool
-Observe:  Tool result is appended to the session context
-Repeat:   LLM receives that result on the next planning step
+Observe:  The assistant's tool-call decision (tool + args) AND the tool
+          result are both appended to the session context, linked by a
+          shared call_id
+Repeat:   The LLM receives that call→result pair on the next planning step
 ```
 
 It is *ReAct-style*, rather than a literal implementation of the original
@@ -27,6 +29,12 @@ ReAct prompting paper: planning and actions are represented as provider
 function calls, and the planner does not expose private chain-of-thought.
 The observable decision is only the selected tool plus its validated
 arguments.
+
+Session memory is split into **short-term (working) memory** — the full,
+detailed call→result trace of the current request — and **long-term memory** —
+the compacted, cross-request conversational history. Section 2.6 specifies
+both, along with the summarization/windowing that keeps the LLM prompt bounded
+regardless of how long a session runs.
 
 This pattern is appropriate because a request often needs database evidence
 before it can be answered. For example, to answer “Which active listings are
@@ -96,30 +104,33 @@ flowchart TD
     ROUTE --> AC[AgentController<br/>syntax validation]
     AC --> SEC["Security Utility<br/>PII/secret regex scan"]
     SEC -->|match found| REJECT["Reject request (400)<br/>log security event"]
-    SEC -->|clean| LOAD["Load session context from DB<br/>(ChatSessionRepository)"]
+    SEC -->|clean| LOAD["Load session context + version from DB<br/>(ChatSessionRepository)"]
     LOAD --> MILE["Log session-start/resume milestone"]
     MILE --> INIT["Loop Controller<br/>reset step_count = 0<br/>max_steps = MAX_STEPS (.env, default 5)"]
     INIT --> STEP[Increment step_count]
-    STEP --> PLAN["Planner: LLM Call<br/>system prompt + tool schemas + session context"]
+    STEP --> WIN["Memory: prepare_context<br/>window recent turns, summarize older,<br/>digest oversized tool data"]
+    WIN --> PLAN["Planner: LLM Call<br/>system prompt + tool schemas + windowed context"]
     PLAN -->|LLM call throws| LLMERR["LLM Call Wrapper<br/>catch, retry x2, log"]
     LLMERR -->|still failing| FALLBACK[Graceful Fallback Node]
     PLAN --> DECIDE{LLM response}
     DECIDE -->|finalize tool call| FIN[Finalize Node]
-    DECIDE -->|data tool call| DISPATCH["Executor / Dispatcher<br/>validate tool name + args"]
+    DECIDE -->|data tool call| RECCALL["Append assistant tool-call turn<br/>(tool + args + call_id) to context"]
+    RECCALL --> DISPATCH["Executor / Dispatcher<br/>validate tool name + args"]
     DISPATCH -->|unknown tool / bad args| TOOLERR1[Structured Error Result]
     DISPATCH -->|valid| EXEC["Tool<br/>validate → call Repository → retry x2"]
     EXEC -->|success| RESULT[Structured Success Result]
     EXEC -->|fails after retries| TOOLERR2[Structured Error Result]
-    RESULT --> APPEND[Append result to session context]
+    RESULT --> APPEND["Append tool result to context<br/>(role=tool, tool_call_id + audit meta)"]
     TOOLERR1 --> APPEND
     TOOLERR2 --> APPEND
     APPEND --> CHECK{step_count >= max_steps?}
     CHECK -->|No| STEP
-    CHECK -->|Yes| FORCED["Forced Finalize<br/>best-effort answer from gathered context"]
-    FIN --> SAVE[Persist updated context to DB]
-    FORCED --> SAVE
+    CHECK -->|Yes| FORCED["Forced Finalize<br/>best-effort answer from THIS request's<br/>gathered context only"]
+    FIN --> COMPACT["Memory: compact_for_persist<br/>keep thread + audit meta, digest heavy payloads"]
+    FORCED --> COMPACT
+    COMPACT --> SAVE["Persist context to DB<br/>(version-guarded, redacted)"]
     SAVE --> RESPOND[Return response to Controller → Client]
-    FALLBACK --> RESPOND
+    FALLBACK --> COMPACT
     REJECT --> RESPOND
 ```
 
@@ -136,7 +147,13 @@ Key rules encoded in this diagram:
 - Session context is **loaded from the DB at the start of the request** and
   **persisted back at the end** (finalize, forced finalize, or fallback) —
   the loop never holds a session's memory only in process memory across
-  requests.
+  requests. What is *sent to the LLM* each step is a windowed/summarized view
+  of that context (short-term working memory + a recap of older turns); what is
+  *stored* is the full conversational thread with heavy payloads digested (see
+  2.6).
+- **Every write is version-guarded** (optimistic concurrency): the context's
+  `version` at load time is passed back to `save_context`, so two overlapping
+  requests on the same session merge instead of silently clobbering each other.
 
 ---
 
@@ -144,8 +161,13 @@ Key rules encoded in this diagram:
 
 ### 2.1 Planner (`backend/app/agent/planner.py`)
 - Responsibility: single LLM call per step. Input = system prompt + tool
-  schemas + running context (prior tool calls/results this request). Output =
-  either a tool call (name + args) or a call to `finalize`.
+  schemas + running context (prior tool calls/results this request, plus
+  compacted history from earlier requests). Output = either a tool call (name +
+  args) or a call to `finalize`.
+- The context the planner is handed has already been passed through
+  `memory.prepare_context` by the loop controller (2.6), so the planner always
+  receives a bounded, windowed message list — it does not itself decide what to
+  keep or summarize.
 - The planner **never touches the database directly** and never contains
   business logic — it only produces a decision for the executor to carry out.
 - Wrapped by the LLM Call Wrapper (2.5) for retries/logging — the planner
@@ -172,18 +194,30 @@ Key rules encoded in this diagram:
   controller itself.
 - At the **start** of a request: resolve the `session_id` (create a new
   session via `SessionRepository` if none was supplied), load that session's
-  stored `context` from the DB, and log the session-start/resume milestone
-  (see section 3). `step_count = 0` for this request regardless of how much
-  prior context exists — the step budget is per-request, the context is
-  per-session.
+  stored `context` **and its `version`** from the DB, and log the
+  session-start/resume milestone (see section 3). `step_count = 0` for this
+  request regardless of how much prior context exists — the step budget is
+  per-request, the context is per-session.
+- **Before each planner call**, the loop controller runs the context through
+  `memory.prepare_context` (2.6) to produce the bounded, windowed message list
+  the planner sends to the LLM.
+- **On each data-tool step**, the loop controller appends the assistant's
+  tool-call decision (tool name + args + a `call_id`) to context *before*
+  dispatching, then appends the paired tool result (`role="tool"`,
+  `tool_call_id`, plus audit `meta`) after — so history records both the intent
+  and the outcome, linked by `call_id`.
 - After each tool result is appended to the in-memory context: check
   `step_count >= max_steps`. If true and the LLM has not called `finalize`,
-  the loop controller forces a finalize (see 2.4) rather than looping again.
+  the loop controller forces a finalize (see 2.4) — passing **only the current
+  request's entries** (`memory.entries_for_request`), so a prior turn's results
+  can never leak into the budget-exhausted summary.
 - At the **end** of a request (finalize, forced finalize, or fallback): the
-  updated context is written back to the session row via
-  `ChatSessionRepository.save_context()` before the response is returned —
-  the loop never keeps a session's memory only in process memory between
-  requests.
+  context is run through `memory.compact_for_persist` (2.6) and written back to
+  the session row via `ChatSessionRepository.save_context(..., expected_version)`
+  before the response is returned. The save is **version-guarded and redacted**
+  — the loop never keeps a session's memory only in process memory between
+  requests, and never persists a secret or silently overwrites a concurrent
+  writer's turn.
 - Wraps the entire per-request loop in a top-level `try/except`. Any
   exception not already handled by a lower layer (planner, executor, tool)
   is caught here, logged at `ERROR` with full traceback, and converted into
@@ -196,10 +230,12 @@ Key rules encoded in this diagram:
   answer to return to the user. Calling it is how the LLM signals "I'm done."
 - **Forced finalize** (max steps reached, no `finalize` call yet): the loop
   controller does *not* ask the LLM to try again — it constructs a best-
-  effort response from whatever tool results are already in context (or,
-  if none are usable, a plain "I wasn't able to complete this within the
-  step budget" message), and returns immediately. This guarantees the
-  request terminates at exactly `max_steps` LLM calls, protecting latency.
+  effort response from whatever **successful tool results from the current
+  request** are already in context (scoped via `memory.entries_for_request`,
+  so a prior turn's results never bleed in), or, if none are usable, a plain
+  "I wasn't able to complete this within the step budget" message, and returns
+  immediately. This guarantees the request terminates at exactly `max_steps`
+  LLM calls, protecting latency.
 - **Graceful fallback** (unhandled exception anywhere in the loop): a fixed,
   user-safe message (e.g. "Something went wrong processing that request —
   please try again or rephrase it.") — never exposes internals.
@@ -211,6 +247,86 @@ Key rules encoded in this diagram:
   attempt regardless of outcome — see section 3.
 - If all retries fail, raises a typed exception that the loop controller
   catches and turns into the graceful fallback.
+
+### 2.6 Memory — short-term vs long-term (`backend/app/agent/memory.py`)
+
+Session memory is one JSON blob per session (`chat_sessions.context`), but it
+is shaped by two distinct concerns that `memory.py` owns so the loop
+controller, planner, and finalize node stay thin.
+
+**Entry vocabulary (provider-native + `meta` sidecar).** Every context entry is
+already a valid OpenAI/Groq chat message, plus a `meta` key carrying our own
+bookkeeping that the provider never sees (`llm_factory` strips it). Four shapes:
+
+| Entry | Shape (abbreviated) | `meta` carries |
+|---|---|---|
+| user | `{role:"user", content:<msg>}` | `type`, `request_id`, `ts` |
+| tool call | `{role:"assistant", content:null, tool_calls:[{id, function:{name, arguments}}]}` | `type`, `request_id`, `step`, `tool`, `ts` |
+| tool result | `{role:"tool", tool_call_id:<id>, content:<json ToolResult>}` | `type`, `request_id`, `step`, `tool`, `success`, `error`, `attempts`, `latency_ms`, `ts` |
+| answer | `{role:"assistant", content:<answer>}` | `type`, `request_id`, `ts` |
+| summary (runtime only) | `{role:"assistant", content:<deterministic recap>}` | `type: "summary"` |
+
+The tool-call and tool-result entries share a `call_id` (`call_{request_id}_{step}`),
+which is what pairs a decision to its outcome. The `meta` mirror on the tool
+result is what makes **"which tools ran, which failed, which succeeded"**
+answerable directly (e.g. by the session API or a test) without re-parsing the
+JSON `content`. This directly fixes the previous format, where only the result
+was stored — the tool name, arguments, and success/failure of a call were not
+recoverable from history.
+
+The `summary` entry is created only by `prepare_context`; it is sent to the
+provider but is not appended to or stored in the session context.
+
+**Short-term (working) memory** = the recent portion of the active session
+context sent verbatim to the LLM. Under the default window this includes the
+full current request trace; if `MEMORY_WINDOW_TURNS` is configured below the
+number of entries produced by a request, its oldest entries are summarized
+too. This lets the LLM reason across dependent steps (query a record, observe
+it, then update it) without re-sending an unbounded history.
+
+**Long-term memory** = the compacted conversational history across *earlier*
+requests: user questions, the agent's answers, and the per-tool audit `meta`,
+with heavy row payloads digested. This is what a resumed session sees.
+
+Two pure functions bound each side:
+
+- `prepare_context(context)` — called by the loop controller before every
+  planner LLM call. Keeps the last `MEMORY_WINDOW_TURNS` entries verbatim,
+  collapses everything older into a single deterministic, rule-based `summary`
+  recap entry, and digests any tool-result `data` whose serialized size exceeds
+  `MEMORY_MAX_DATA_CHARS` (row counts + a few sample ids retained, full rows
+  dropped). Pairing is preserved: the window never begins on a `tool` result
+  whose `tool_calls` turn was trimmed off — such an orphan is folded into the
+  summary instead — so the provider always sees a valid call→result sequence.
+- `compact_for_persist(context)` — called before `save_context`. Retains the
+  full conversational thread and every tool's audit `meta` (so the stored
+  history stays a faithful, inspectable record), but digests oversized
+  tool-result payloads. This bounds the size contributed by each individual
+  tool result; it does not impose a retention limit on the number of
+  conversational turns stored in a session.
+
+**Why summarize/window at all.** Every planner step re-sends the context; without
+a window it grows with every turn and every tool call, driving token cost and
+latency up and eventually overflowing the model's context window (which would
+surface as an `LLMCallError` → graceful fallback, silently losing the turn).
+Windowing makes the LLM prompt size a function of `MEMORY_WINDOW_TURNS`, not
+total session length. The persisted thread deliberately remains complete for
+session inspection and optimistic-concurrency merging.
+
+**Config** (`config/settings.py`, read from `.env`): `MEMORY_WINDOW_TURNS`
+(default `12`) and `MEMORY_MAX_DATA_CHARS` (default `2000`).
+
+**Backward compatibility.** Legacy sessions hold flat `{role, content}` entries
+with no `meta`/`tool_calls`. Every reader falls back to parsing `content` when
+`meta` is absent, and `llm_factory` downgrades an unpaired `tool` entry (no
+`tool_call_id`, or one whose call turn was windowed away) to a `user` turn,
+which Groq accepts. No destructive migration of existing blobs.
+
+**Redaction & concurrency** live at the persistence boundary (2.3, and
+`ChatSessionRepository`): secrets are stripped before write (shared
+`app/utilities/redaction.py`, same rule as the log redactor), and writes are
+optimistic-concurrency guarded by a `version` column (migration
+`0004_add_chat_sessions_version.sql`) with a common-prefix merge on a lost race.
 
 ### 2.7 Session Controller (`backend/app/controllers/session_controller.py`)
 - A plain CRUD controller, no LLM/agent logic involved — sits at the API
@@ -226,10 +342,12 @@ Key rules encoded in this diagram:
 
 ### 2.8 Data flow summary
 `Client → API Route → AgentController (syntax check) → Security Utility (PII
-scan) → Loop Controller (load session context, reset step) → Planner (LLM) →
-Executor (dispatch) → Tool (validate → call Repository → retry) → structured
-result → back into session context → Loop Controller decides
-continue/finalize → persist context → Response`
+scan) → Loop Controller (load session context + version, reset step) → [per
+step: Memory.prepare_context (window/summarize) → Planner (LLM) → record
+tool-call decision → Executor (dispatch) → Tool (validate → call Repository →
+retry) → structured result + audit meta → back into session context] → Loop
+Controller decides continue/finalize → Memory.compact_for_persist → persist
+context (version-guarded, redacted) → Response`
 
 Note the repository dependency: **tools never talk to SQLite directly.**
 Every data tool calls the matching repository method
@@ -377,6 +495,7 @@ project_root/
 │   │   │   ├── executor.py      # dispatch: tool name/args -> tool call
 │   │   │   ├── loop_controller.py # step_count, max_steps (.env), session load/save, finalize/fallback
 │   │   │   ├── finalize.py      # finalize tool + forced-finalize + fallback text
+│   │   │   ├── memory.py        # history entry builders, prompt windowing/summary, payload digestion
 │   │   │   ├── llm_client.py    # LLM HTTP wrapper: retry, logging, cost calc (provider-agnostic)
 │   │   │   ├── llm_factory.py   # LLMProviderClient registry (GroqClient today)
 │   │   │   └── prompts.py       # system prompt template (section 4)
@@ -392,6 +511,7 @@ project_root/
 │   │   ├── utilities/
 │   │   │   ├── security.py       # regex-based PII/secret pattern scanner (section 0)
 │   │   │   ├── logging_utils.py  # structured JSON logging helpers (section 3)
+│   │   │   ├── redaction.py      # shared secret-key redaction for logs and stored context
 │   │   │   └── tool_execution.py # shared retry/timeout wrapper used by the tool layer
 │   │   └── models/
 │   │       └── schemas.py       # Pydantic models: tool inputs/outputs, structured results
@@ -400,14 +520,15 @@ project_root/
 │   │   ├── migrations/
 │   │   │   ├── 0001_create_real_estate_listings.sql
 │   │   │   ├── 0002_create_marketing_campaigns.sql
-│   │   │   └── 0003_create_chat_sessions.sql
+│   │   │   ├── 0003_create_chat_sessions.sql
+│   │   │   └── 0004_add_chat_sessions_version.sql
 │   │   └── seed_database.py
 │   ├── data/                    # source Excel files consumed by the seeder
 │   │   ├── Real Estate Listings.xlsx
 │   │   └── Marketing Campaigns.xlsx
 │   ├── logs/                    # JSON log output (gitignored)
 │   ├── config/
-│   │   └── settings.py          # reads .env: MAX_STEPS (default 5), model config, pricing table
+│   │   └── settings.py          # reads .env: MAX_STEPS, MEMORY_* config, model config, pricing table
 │   ├── tests/                   # pytest suite, mirrors app/ package layout
 │   ├── main.py                  # entry point / FastAPI app
 │   ├── .env                     # MAX_STEPS, LLM API keys/config (gitignored)

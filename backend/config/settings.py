@@ -21,6 +21,16 @@ class Settings(BaseSettings):
     # loop indefinitely.
     tool_timeout_seconds: float = Field(default=5.0, alias="TOOL_TIMEOUT_SECONDS")
 
+    # Conversational-memory compaction. `MEMORY_WINDOW_TURNS` is how many of
+    # the most recent history entries are sent to the LLM verbatim; anything
+    # older is collapsed into a single summary recap so prompt size stops
+    # growing linearly with session length. `MEMORY_MAX_DATA_CHARS` caps the
+    # serialized size of a single tool-result `data` payload kept in history —
+    # larger payloads are digested (row counts + ids retained, full rows
+    # dropped) so one big query can't dominate the window.
+    memory_window_turns: int = Field(default=12, alias="MEMORY_WINDOW_TURNS", ge=1)
+    memory_max_data_chars: int = Field(default=2000, alias="MEMORY_MAX_DATA_CHARS", ge=1)
+
     # LLM provider selection: LLM_PROVIDER/LLM_MODEL are generic so the same
     # settings shape works for any provider; the API key is provider-specific
     # so multiple providers can be configured side by side.

@@ -13,13 +13,20 @@ fallback) is also appended to context before persisting — otherwise a
 session would retain past user messages and tool results but never its
 own past answers, breaking cross-request conversational memory. See
 `DECISIONS.md`.
+
+History shape is owned by `app/agent/memory.py`: every entry is a
+provider-native message plus a `meta` sidecar. Each step records the
+assistant's `tool_calls` decision (tool + args) *before* dispatch and the
+paired `tool` result after, linked by `call_id`, so the stored thread keeps
+both intent and outcome. `prepare_context` windows/summarizes what is sent
+to the LLM; `compact_for_persist` bounds what is stored.
 """
 
 from __future__ import annotations
 
-import json
+import time
 
-from app.agent import executor, planner
+from app.agent import executor, memory, planner
 from app.agent.finalize import forced_finalize, graceful_fallback, run_finalize
 from app.agent.prompts import build_system_prompt
 from app.repositories.chat_session_repository import ChatSessionRepository
@@ -41,7 +48,7 @@ def _default_session_name(user_message: str) -> str:
 
 
 def run(session_id: str | None, user_message: str, request_id: str) -> tuple[str, str]:
-    resolved_session_id, context, is_new = ChatSessionRepository.get_or_create(
+    resolved_session_id, context, is_new, loaded_version = ChatSessionRepository.get_or_create(
         session_id, _default_session_name(user_message)
     )
     log_session_event(
@@ -51,7 +58,7 @@ def run(session_id: str | None, user_message: str, request_id: str) -> tuple[str
         is_new,
     )
 
-    context.append({"role": "user", "content": user_message})
+    context.append(memory.user_entry(user_message, request_id))
 
     step_count = 0
     max_steps = settings.max_steps
@@ -61,21 +68,41 @@ def run(session_id: str | None, user_message: str, request_id: str) -> tuple[str
         result = None
         while True:
             step_count += 1
-            decision = planner.plan(system_prompt, context, TOOL_SCHEMAS, step_count)
+            # Window/summarize before every LLM call so prompt size is bounded
+            # by MEMORY_WINDOW_TURNS rather than total session length.
+            llm_context = memory.prepare_context(context)
+            decision = planner.plan(system_prompt, llm_context, TOOL_SCHEMAS, step_count)
 
             if decision.type == "finalize":
                 result = run_finalize(decision.answer)
                 break
 
+            # Record the assistant's decision (tool + args) BEFORE dispatching,
+            # then the paired result — so history keeps both the intent and the
+            # outcome, linked by call_id.
+            call_id = memory.make_call_id(request_id, step_count)
+            context.append(
+                memory.tool_call_entry(
+                    call_id, decision.tool_name, decision.args, request_id, step_count
+                )
+            )
+            tool_started_at = time.perf_counter()
             result = executor.dispatch(decision.tool_name, decision.args, step_count, request_id)
-            context.append({"role": "tool", "content": json.dumps(result.model_dump())})
+            tool_latency_ms = (time.perf_counter() - tool_started_at) * 1000
+            context.append(
+                memory.tool_result_entry(
+                    call_id, result, request_id, step_count, latency_ms=tool_latency_ms
+                )
+            )
 
             if step_count >= max_steps:
-                result = forced_finalize(context)
+                # Scope the budget-exhausted summary to THIS request only, so a
+                # prior turn's tool results can never leak into it.
+                result = forced_finalize(memory.entries_for_request(context, request_id))
                 break
 
         answer = result.data["answer"]
-        context.append({"role": "assistant", "content": answer})
+        context.append(memory.assistant_answer_entry(answer, request_id))
         return answer, resolved_session_id
     except Exception:
         get_logger().error(
@@ -85,7 +112,11 @@ def run(session_id: str | None, user_message: str, request_id: str) -> tuple[str
         )
         result = graceful_fallback()
         answer = result.data["answer"]
-        context.append({"role": "assistant", "content": answer})
+        context.append(memory.assistant_answer_entry(answer, request_id))
         return answer, resolved_session_id
     finally:
-        ChatSessionRepository.save_context(resolved_session_id, context)
+        ChatSessionRepository.save_context(
+            resolved_session_id,
+            memory.compact_for_persist(context),
+            expected_version=loaded_version,
+        )

@@ -69,6 +69,57 @@ class TestSaveContext:
         after = ChatSessionRepository.get_session(sid)["updated_at"]
         assert after >= before
 
+    def test_increments_version_on_each_save(self, db_conn):
+        sid = ChatSessionRepository.create_session("Version Test")
+        assert ChatSessionRepository.get_session(sid)["version"] == 0
+
+        ChatSessionRepository.save_context(sid, [{"role": "user", "content": "a"}])
+        assert ChatSessionRepository.get_session(sid)["version"] == 1
+
+        ChatSessionRepository.save_context(sid, [{"role": "user", "content": "a"}, {"role": "assistant", "content": "b"}])
+        assert ChatSessionRepository.get_session(sid)["version"] == 2
+
+    def test_redacts_sensitive_keys_before_persisting(self, db_conn):
+        sid = ChatSessionRepository.create_session("Redaction Test")
+        context = [
+            {
+                "role": "tool",
+                "content": "envelope",
+                "meta": {"args": {"city": "Austin", "api_key": "sk-secret-123"}},
+            }
+        ]
+
+        ChatSessionRepository.save_context(sid, context)
+
+        reloaded = ChatSessionRepository.get_context(sid)
+        assert reloaded[0]["meta"]["args"]["api_key"] == "[REDACTED]"
+        assert reloaded[0]["meta"]["args"]["city"] == "Austin"
+
+    def test_lost_race_merges_new_entries_instead_of_clobbering(self, db_conn):
+        sid = ChatSessionRepository.create_session("Concurrency Test")
+        # This request loaded the session at version 0 with a single base entry.
+        base_entry = {"role": "user", "content": "base"}
+        # A concurrent writer then persisted a new turn on top (version -> 1)
+        # before our save lands.
+        db_conn.execute(
+            "UPDATE chat_sessions SET context = ?, version = 1 WHERE id = ?",
+            (json.dumps([base_entry, {"role": "assistant", "content": "concurrent-answer"}]), sid),
+        )
+        db_conn.commit()
+
+        # Our save carries the base entry we loaded plus our own new entry,
+        # guarded by the version we loaded (0).
+        our_context = [base_entry, {"role": "assistant", "content": "our-new-answer"}]
+        ChatSessionRepository.save_context(sid, our_context, expected_version=0)
+
+        reloaded = ChatSessionRepository.get_context(sid)
+        contents = [e["content"] for e in reloaded]
+        # The concurrent writer's turn is preserved AND ours is appended —
+        # nothing silently dropped.
+        assert contents == ["base", "concurrent-answer", "our-new-answer"]
+        # Version advanced past the concurrent writer's.
+        assert ChatSessionRepository.get_session(sid)["version"] == 2
+
 
 class TestFullRoundTrip:
     """End-to-end: create → save → reload → verify."""

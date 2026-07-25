@@ -79,18 +79,62 @@ class GroqClient(LLMProviderClient):
         ]
 
     def _build_messages(self, messages: list[dict]) -> list[dict]:
-        # Groq's chat API rejects a "tool" role message unless it is paired
-        # with a `tool_call_id` from a preceding assistant `tool_calls`
-        # turn — our stored context is a flat {"role", "content"} history
-        # with no such pairing, so tool results are sent as "user" turns
-        # instead (same simplification the previous Gemini client made).
-        return [
-            {
-                "role": message.get("role") if message.get("role") in ("system", "assistant") else "user",
-                "content": message.get("content", ""),
-            }
-            for message in messages
-        ]
+        """Translate stored history into Groq/OpenAI chat messages.
+
+        Our history entries are already provider-native (see
+        `app/agent/memory.py`), carrying an extra `meta` sidecar the provider
+        must not see. Here we:
+        - strip `meta` from every entry;
+        - preserve an assistant `tool_calls` turn and its paired `tool` result
+          (linked by `tool_call_id`) so the model gets a real call→result
+          sequence and its function-calling training applies;
+        - downgrade a *legacy* `tool` entry that has no `tool_call_id` (rows
+          written before structured pairing existed) to a plain `user` turn,
+          since Groq rejects an unpaired `tool` message.
+        """
+        built: list[dict] = []
+        # Track which tool_call ids have an emitted assistant turn, so a `tool`
+        # result whose call turn was trimmed by windowing is treated as legacy.
+        known_call_ids: set[str] = set()
+
+        for message in messages:
+            role = message.get("role")
+
+            if role == "assistant" and message.get("tool_calls"):
+                tool_calls = message["tool_calls"]
+                for call in tool_calls:
+                    if isinstance(call, dict) and call.get("id"):
+                        known_call_ids.add(call["id"])
+                built.append(
+                    {
+                        "role": "assistant",
+                        "content": message.get("content"),
+                        "tool_calls": tool_calls,
+                    }
+                )
+                continue
+
+            if role == "tool":
+                call_id = message.get("tool_call_id")
+                if call_id and call_id in known_call_ids:
+                    built.append(
+                        {
+                            "role": "tool",
+                            "tool_call_id": call_id,
+                            "content": message.get("content", ""),
+                        }
+                    )
+                else:
+                    # Unpaired / legacy tool result — fold into a user turn so
+                    # the model still sees the outcome without a protocol error.
+                    built.append({"role": "user", "content": message.get("content", "")})
+                continue
+
+            # system / assistant-answer / user / summary recap
+            normalized_role = role if role in ("system", "assistant") else "user"
+            built.append({"role": normalized_role, "content": message.get("content", "")})
+
+        return built
 
     def _recover_from_tool_use_failed(self, error: Exception) -> Any | None:
         """Best-effort recovery for Groq's `tool_use_failed` 400 error.

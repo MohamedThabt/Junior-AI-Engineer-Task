@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 
+from app.agent import memory
 from app.models.schemas import ToolResult
 
 FINALIZE_TOOL_NAME = "finalize"
@@ -32,29 +33,16 @@ def run_finalize(answer: str) -> ToolResult:
     )
 
 
-def _extract_successful_tool_results(context: list) -> list[dict]:
-    """Pull out the `data`/`tool` of every successful tool-result entry
-    appended to *context* this request (`{"role": "tool", "content": <json
-    ToolResult envelope>}`). Malformed/foreign entries are skipped rather
-    than raising — this is a best-effort summary, not a strict parser."""
-    successes: list[dict] = []
-    for entry in context:
-        if not isinstance(entry, dict) or entry.get("role") != "tool":
-            continue
-        try:
-            payload = json.loads(entry["content"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        if isinstance(payload, dict) and payload.get("success"):
-            successes.append(payload)
-    return successes
-
-
 def forced_finalize(context: list) -> ToolResult:
     """Called when `step_count >= max_steps` and the LLM never called
     `finalize`. Never makes another LLM call — this is what guarantees the
-    request terminates at exactly `max_steps` LLM calls."""
-    successes = _extract_successful_tool_results(context)
+    request terminates at exactly `max_steps` LLM calls.
+
+    *context* is expected to be scoped to the current request (see
+    `loop_controller.run`), so the summary can never splice in a prior turn's
+    tool results. Extraction is meta-aware with a legacy `content`-parse
+    fallback (see `memory.successful_tool_results`)."""
+    successes = memory.successful_tool_results(context)
 
     if not successes:
         answer = _BUDGET_EXHAUSTED_MESSAGE

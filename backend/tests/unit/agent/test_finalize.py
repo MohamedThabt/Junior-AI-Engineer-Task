@@ -46,6 +46,33 @@ class TestForcedFinalize:
         assert "query_real_estate" in result.data["answer"]
         assert "LST-5001" in result.data["answer"]
 
+    def test_uses_meta_mirror_for_structured_entries(self):
+        toolResultEnvelope = {
+            "success": True,
+            "data": {"listings": [{"listing_id": "LST-7777"}], "count": 1},
+            "error": None,
+            "tool": "query_real_estate",
+            "attempts": 1,
+        }
+        context = [
+            {
+                "role": "tool",
+                "tool_call_id": "call_req-a_1",
+                "content": json.dumps(toolResultEnvelope),
+                "meta": {
+                    "type": "tool_result",
+                    "request_id": "req-a",
+                    "tool": "query_real_estate",
+                    "success": True,
+                },
+            }
+        ]
+
+        result = forced_finalize(context)
+
+        assert "query_real_estate" in result.data["answer"]
+        assert "LST-7777" in result.data["answer"]
+
     def test_returns_fixed_budget_message_when_context_has_no_usable_results(self):
         context = [{"role": "user", "content": "Show listings in Austin"}]
 

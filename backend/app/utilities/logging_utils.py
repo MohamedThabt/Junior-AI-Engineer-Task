@@ -11,7 +11,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import time
 import uuid
 from contextvars import ContextVar
@@ -19,12 +18,12 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from app.utilities.redaction import redact_mapping
+
 LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
 _LOGGER_NAME = "app.agent"
 
 request_id_var: ContextVar[str] = ContextVar("request_id", default="")
-
-_SENSITIVE_FIELD_PATTERN = re.compile(r"(key|token|secret|password|credential)", re.IGNORECASE)
 
 
 def new_request_id() -> str:
@@ -60,12 +59,7 @@ def _get_logger() -> logging.Logger:
 
 
 def _redact(args: dict[str, Any] | None) -> dict[str, Any] | None:
-    if args is None:
-        return None
-    return {
-        key: ("[REDACTED]" if _SENSITIVE_FIELD_PATTERN.search(key) else value)
-        for key, value in args.items()
-    }
+    return redact_mapping(args)
 
 
 def _emit(entry: dict[str, Any]) -> None:
