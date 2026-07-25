@@ -82,6 +82,17 @@
   - Random shuffle instead of round-robin — rejected: round-robin distributes load evenly and is deterministic, making log traces easier to follow.
 - **Rationale:** quota exhaustion on a single key is the most common production failure mode for free/low-tier Groq accounts. Rotating across a pool of keys converts a hard failure (and a wasted `_MAX_ATTEMPTS`-round retry loop) into a transparent continuation of the current loop iteration, with zero changes to callers.
 
+## 12. SQLite over direct Excel file operations
+
+- **Decision:** all persistent data (listings, campaigns, chat sessions) is stored in a SQLite database (`db/app.db`) accessed exclusively through the repository layer. Excel files are used only as a one-time seed source (`db/seed_database.py`); no tool or repository ever reads from or writes to an `.xlsx` file at runtime.
+- **Alternatives considered:**
+  - Reading and writing `.xlsx` files directly via `openpyxl`/`pandas` for every tool call — rejected for the reasons below.
+- **Rationale:**
+  - **Atomic operations and system reliability.** Every write in the repository (`insert`, `update`, `delete`) is wrapped in an explicit `conn.commit()` on success and `conn.rollback()` on any exception (see `app/repositories/real_estate_repository.py` and the campaign/session equivalents). SQLite's WAL journal guarantees that a crash mid-write leaves the database in its last committed state — no partial row, no corrupted file. An Excel write has no such guarantee: a crash mid-save can corrupt the entire workbook.
+  - **Resource efficiency per operation.** SQLite touches only the pages that contain the affected rows. An Excel library must deserialise the entire workbook into memory, apply the change, and serialise the whole file back to disk — even for a single-cell update. For a dataset that grows with every agent loop iteration, that per-operation cost compounds quickly.
+  - **Speed.** SQLite executes indexed point lookups and single-row writes in microseconds. An equivalent Excel round-trip (parse → mutate → serialise) takes tens to hundreds of milliseconds regardless of how small the change is, adding measurable latency to every tool call inside the agent loop.
+  - **Concurrent-access safety.** SQLite's busy-timeout (`settings.tool_timeout_seconds`, decision #4) serialises concurrent writers cleanly. `openpyxl` has no locking primitive; two simultaneous writes to the same `.xlsx` file produce silent data loss or a corrupt archive.
+
 ## 11. LLM failure does not trigger a replan — it falls back gracefully
 - **Decision:** `LLMCallError` (raised by `call_llm` after all retry attempts and all key rotations are exhausted) propagates unchanged out of `planner.plan()` and is caught by the `except Exception` handler in `loop_controller.run()`, which calls `graceful_fallback()` and returns a user-facing apology. The loop does **not** attempt to replan, retry the planner, or inject a recovery message into context.
 - **Alternatives considered:**
