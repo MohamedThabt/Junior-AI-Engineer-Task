@@ -114,6 +114,7 @@ def log_tool_call(
     latency_ms: float,
     success: bool,
     error: str | None,
+    result: Any | None = None,
 ) -> None:
     _emit(
         {
@@ -126,6 +127,7 @@ def log_tool_call(
             "latency_ms": latency_ms,
             "success": success,
             "error": error,
+            "result": result,
         }
     )
 

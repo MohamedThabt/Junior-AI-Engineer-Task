@@ -71,18 +71,6 @@ def dispatch(tool_name: str, args: dict, loop_iteration: int, request_id: str) -
             attempts=1,
         )
 
-    latency_ms = (time.perf_counter() - start) * 1000
-    # `log_tool_call` already redacts sensitive arg keys internally
-    # (key/token/secret/password/credential substring match) — no separate
-    # redaction step needed here.
-    log_tool_call(
-        request_id=request_id,
-        loop_iteration=loop_iteration,
-        tool_name=tool_name,
-        args=args,
-        attempt_number=result.attempts or 1,
-        latency_ms=latency_ms,
-        success=result.success,
-        error=result.error,
-    )
+    # Logging is handled by make_attempt_logger inside run_with_retry;
+    # logging here would duplicate every successful tool_call entry.
     return result

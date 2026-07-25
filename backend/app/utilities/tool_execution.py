@@ -11,7 +11,7 @@ no thread-based timeout is needed here — a hung/locked call simply raises
 from __future__ import annotations
 
 import time
-from typing import Callable, TypeVar
+from typing import Any, Callable, TypeVar
 
 from pydantic import ValidationError
 
@@ -19,7 +19,7 @@ from app.utilities.logging_utils import log_tool_call
 
 T = TypeVar("T")
 
-OnAttempt = Callable[[int, bool, str | None, float], None]
+OnAttempt = Callable[[int, bool, str | None, float, Any], None]
 
 
 def run_with_retry(
@@ -30,7 +30,7 @@ def run_with_retry(
 ) -> tuple[T, int]:
     """Run *operation*, retrying on any exception up to *max_attempts* times total.
 
-    `on_attempt(attempt_number, success, error, latency_ms)` is called after
+    `on_attempt(attempt_number, success, error, latency_ms, result)` is called after
     every attempt (success or failure) so the caller can log each one —
     the tool contract requires logging every attempt, not just the final
     outcome.
@@ -46,10 +46,10 @@ def run_with_retry(
         except Exception as exc:
             last_error = exc
             if on_attempt is not None:
-                on_attempt(attempt, False, str(exc), (time.perf_counter() - start) * 1000)
+                on_attempt(attempt, False, str(exc), (time.perf_counter() - start) * 1000, None)
             continue
         if on_attempt is not None:
-            on_attempt(attempt, True, None, (time.perf_counter() - start) * 1000)
+            on_attempt(attempt, True, None, (time.perf_counter() - start) * 1000, result)
         return result, attempt
 
     raise last_error
@@ -64,7 +64,7 @@ def format_validation_error(exc: ValidationError) -> str:
 def make_attempt_logger(tool_name: str, request_id: str, loop_iteration: int, args: dict) -> OnAttempt:
     """Build an `on_attempt` callback that logs each retry attempt via `log_tool_call`."""
 
-    def _log(attempt: int, success: bool, error: str | None, latency_ms: float) -> None:
+    def _log(attempt: int, success: bool, error: str | None, latency_ms: float, result: Any) -> None:
         log_tool_call(
             request_id=request_id,
             loop_iteration=loop_iteration,
@@ -74,6 +74,7 @@ def make_attempt_logger(tool_name: str, request_id: str, loop_iteration: int, ar
             latency_ms=latency_ms,
             success=success,
             error=error,
+            result=result,
         )
 
     return _log
