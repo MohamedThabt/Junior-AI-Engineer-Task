@@ -9,7 +9,6 @@ import {
   Megaphone, 
   Activity, 
   ShieldAlert, 
-  Trash2, 
   Zap, 
   RefreshCw,
   ArrowUpRight
@@ -50,7 +49,9 @@ export function AgentChatView({
   onRefreshHealth,
   onOpenContextViewer,
   onOpenEvalSuite,
-  onOpenToolRegistry
+  onOpenToolRegistry,
+  prefillPrompt,
+  prefillNonce
 }) {
   const [inputPrompt, setInputPrompt] = useState("")
   const [copiedId, setCopiedId] = useState(null)
@@ -63,6 +64,19 @@ export function AgentChatView({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, [messages, isLoading])
+
+  // Fills the composer with a prompt picked from the Evaluation Suite modal.
+  // Intentionally does NOT send — the user reviews/edits, then hits Send.
+  useEffect(() => {
+    if (!prefillNonce) return
+    setInputPrompt(prefillPrompt || "")
+    textareaRef.current?.focus()
+  }, [prefillNonce, prefillPrompt])
+
+  const fillPrompt = (text) => {
+    setInputPrompt(text)
+    textareaRef.current?.focus()
+  }
 
   const handleSubmit = (e) => {
     e?.preventDefault()
@@ -137,12 +151,13 @@ export function AgentChatView({
               </p>
             </div>
 
-            {/* Prompt Starter Chips */}
+            {/* Prompt Starter Chips — fill the composer only, review before sending */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-left max-w-xl mx-auto">
               {CLEAN_STARTERS.map((item, idx) => (
                 <button
                   key={idx}
-                  onClick={() => onSendMessage(item.prompt)}
+                  onClick={() => fillPrompt(item.prompt)}
+                  title="Fills the input below — press Send to run it"
                   className="p-4 rounded-2xl bg-white border border-slate-200 hover:border-slate-400 hover:shadow-md transition-all duration-200 group space-y-1.5 text-left"
                 >
                   <div className="flex items-center justify-between">
@@ -167,14 +182,6 @@ export function AgentChatView({
             {/* Header Toolbar */}
             <div className="flex items-center justify-between pb-3 border-b border-slate-200 text-xs text-slate-500">
               <span className="font-semibold text-slate-900 text-sm">{session.session_name}</span>
-              <button
-                onClick={onClearMessages}
-                className="hover:text-rose-600 flex items-center gap-1.5 transition-colors font-medium"
-                title="Clear conversation"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Clear Chat</span>
-              </button>
             </div>
 
             {messages.map((msg) => (

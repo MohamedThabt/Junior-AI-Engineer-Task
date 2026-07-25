@@ -47,6 +47,12 @@ export default function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [customApiUrl, setCustomApiUrl] = useState(getStoredBaseUrl())
 
+  // Prompt prefill signal — picking an eval-suite prompt only fills the chat
+  // composer, it never auto-sends. `prefillNonce` forces the effect in
+  // AgentChatView to re-fire even if the same prompt text is chosen twice.
+  const [prefillPrompt, setPrefillPrompt] = useState("")
+  const [prefillNonce, setPrefillNonce] = useState(0)
+
   // Check health
   const checkHealth = useCallback(async () => {
     const res = await getHealth()
@@ -236,6 +242,13 @@ export default function App() {
     }
   }
 
+  // Fill (but never auto-send) the chat composer with a prompt, used by the
+  // Evaluation Suite modal's "Use Prompt" action.
+  const handleFillPrompt = (promptText) => {
+    setPrefillPrompt(promptText)
+    setPrefillNonce(n => n + 1)
+  }
+
   // Clear messages for current session
   const handleClearMessages = () => {
     if (!selectedSession) return
@@ -308,6 +321,8 @@ export default function App() {
           onOpenContextViewer={() => setIsContextViewerOpen(true)}
           onOpenEvalSuite={() => setIsEvalSuiteOpen(true)}
           onOpenToolRegistry={() => setIsToolRegistryOpen(true)}
+          prefillPrompt={prefillPrompt}
+          prefillNonce={prefillNonce}
         />
       </main>
 
@@ -315,7 +330,7 @@ export default function App() {
       <EvaluationSuiteModal
         isOpen={isEvalSuiteOpen}
         onClose={() => setIsEvalSuiteOpen(false)}
-        onSelectPrompt={handleSendMessage}
+        onSelectPrompt={handleFillPrompt}
       />
 
       {/* Registered Tool Registry Modal */}

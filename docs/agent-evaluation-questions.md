@@ -49,7 +49,16 @@ Key design facts the evaluation exercises:
 
 ## Category A — One tool, straightforward (smoke tests)
 
-These confirm each read tool is reachable and returns sane data.
+These confirm each of the **five core operations required by the task** —
+**Read, Query, Insert, Modify, and Delete** — is reachable through its tool(s)
+and behaves correctly on a clean, unambiguous happy path (no filters to
+disambiguate, no missing records, no validation errors). Harder variants of
+insert/update/delete (non-existent records, ambiguous targets) are covered
+separately in Categories C and D.
+
+> ⚠️ **A5–A9 are destructive/stateful** (they insert or mutate rows, and A9
+> deletes one). Run them against a throwaway/re-seedable DB, or re-seed
+> (`python -m db.seed_database`) afterward, same as the note on D4.
 
 ### A1. Real-estate query by city + status
 - **Prompt:** "List the active listings in Seattle."
@@ -76,6 +85,55 @@ These confirm each read tool is reachable and returns sane data.
 - **Tests:** `query_real_estate` with `state="Hawaii"` (no rows in seed).
 - **Expected:** Tool returns 0 rows; agent says plainly there are none.
   **Must not** invent a listing (Rule 5).
+
+### A5. Insert — new real-estate listing
+- **Prompt:** "Add a new listing: LST-7001, a single-family house in Denver,
+  Colorado, 4 bedrooms, 3 bathrooms, 2,400 sqft, built in 2015, listed at
+  $525,000, status Active."
+- **Tests:** `insert_real_estate` with `listing_id="LST-7001"` and all
+  required columns (`property_type`, `city`, `state`, `bedrooms`,
+  `bathrooms`, `square_footage`, `year_built`, `list_price`,
+  `listing_status`).
+- **Expected:** One insert call succeeds (`LST-7001` is outside the seeded
+  `LST-5001`–`LST-6000` range, so it's guaranteed new). Agent confirms the
+  listing was created with the given details.
+- **Fail if:** it claims success without calling the tool, or fabricates a
+  different ID/field than what was requested.
+
+### A6. Insert — new marketing campaign
+- **Prompt:** "Create a new campaign CMP-9500 named 'Fall Referral Push' on
+  the Email channel, running 2024-09-01 to 2024-09-30, with a $10,000
+  budget, $0 spent so far, 0 impressions, 0 clicks, 0 conversions, and $0
+  revenue."
+- **Tests:** `insert_campaign` with `campaign_id="CMP-9500"` and all required
+  columns (`campaign_name`, `channel`, `start_date`, `end_date`,
+  `budget_allocated`, `amount_spent`, `impressions`, `clicks`,
+  `conversions`, `revenue_generated`).
+- **Expected:** One insert call succeeds (`CMP-9500` is outside the seeded
+  `CMP-8001`–`CMP-9000` range). Agent confirms creation.
+
+### A7. Modify — update an existing real-estate listing
+- **Prompt:** "Update listing LST-5001 — change its list price to $610,000."
+- **Tests:** `update_real_estate` with `listing_id="LST-5001"`,
+  `list_price=610000`.
+- **Expected:** One update call succeeds (`success=True`); agent confirms
+  the new list price. **Fail if** it reports success without calling the
+  tool, or changes a field the user didn't ask about.
+
+### A8. Modify — update an existing campaign
+- **Prompt:** "Update campaign CMP-8001 — set its amount spent to $15,000."
+- **Tests:** `update_campaign` with `campaign_id="CMP-8001"`,
+  `amount_spent=15000`.
+- **Expected:** One update call succeeds; agent confirms the change.
+
+### A9. Delete — remove an existing real-estate listing (happy-path control)
+- **Prompt:** "Delete listing LST-6000."
+- **Tests:** `delete_real_estate` with `listing_id="LST-6000"` (exact PK,
+  exists exactly once — the last seeded listing).
+- **Expected:** One delete call succeeds; agent confirms `LST-6000` was
+  removed. This is the real-estate-side counterpart to the campaign control
+  case in **D4** — together they prove delete works end-to-end when the PK
+  is unambiguous, which contrasts with the clarification behavior in D1–D3.
 
 ---
 
