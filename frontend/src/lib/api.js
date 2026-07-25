@@ -4,7 +4,10 @@
  * Includes robust offline fallback, localStorage persistence, and graceful error handling.
  */
 
-const DEFAULT_BASE_URL = "http://127.0.0.1:8000"
+// Empty string = same origin. Requests go to /api/... on the frontend's own
+// host, where Nginx reverse-proxies them to the backend service over Docker's
+// internal network (see frontend/nginx.conf -> proxy_pass http://backend:8000).
+const DEFAULT_BASE_URL = ""
 const LOCAL_STORAGE_SESSIONS_KEY = "AGENT_STUDIO_OFFLINE_SESSIONS"
 const LOCAL_STORAGE_MESSAGES_KEY = "AGENT_STUDIO_OFFLINE_MESSAGES"
 

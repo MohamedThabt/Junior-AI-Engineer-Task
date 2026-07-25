@@ -92,7 +92,7 @@ export function AgentChatView({
           <div className="flex items-center gap-2">
             <Zap className="w-4 h-4 text-amber-600 flex-shrink-0" />
             <span className="font-medium">
-              FastAPI Gateway Disconnected — Please make sure the backend server is running at <code className="bg-amber-100 px-1.5 py-0.5 rounded text-amber-950 font-mono">http://127.0.0.1:8000</code>.
+              FastAPI Gateway Disconnected — Please make sure the backend service is running.
             </span>
           </div>
 

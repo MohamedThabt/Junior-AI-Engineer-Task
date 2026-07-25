@@ -392,7 +392,7 @@ export default function App() {
             <Input
               value={customApiUrl}
               onChange={(e) => setCustomApiUrl(e.target.value)}
-              placeholder="http://127.0.0.1:8000"
+              placeholder="(leave empty to use built-in proxy)"
             />
           </div>
 
