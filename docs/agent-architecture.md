@@ -66,6 +66,11 @@ Client
     → Validation & Security Utility             backend/app/utilities/security.py
         - syntax validation (non-empty, length bounds, encoding)
         - PII / sensitive-data pattern scan (see below)
+    → Input Guardrail (`backend/app/agent/guardrail.py`)
+        - LLM scope check: is the message about real estate / campaign data?
+        - Uses a separate, smaller model (GUARDRAIL_MODEL) for low latency
+        - Fails open: if the judge call errors, the request continues to the loop
+        - Out-of-scope → return refusal in the user's language; never enters the loop
     → Agent Loop (Loop Controller → Planner → Executor → Tools)
     → Response back up through Controller → API Route → Client
 ```
@@ -107,7 +112,10 @@ flowchart TD
     SEC -->|match found| REJECT["Reject request (400)<br/>log security event"]
     SEC -->|clean| LOAD["Load session context + version from DB<br/>(ChatSessionRepository)"]
     LOAD --> MILE["Log session-start/resume milestone"]
-    MILE --> INIT["Loop Controller<br/>reset loop_iteration_count = 0<br/>max_loop_iterations = MAX_LOOP_ITERATIONS (.env, default 5)"]
+    MILE --> GUARD["Input Guardrail<br/>LLM scope check (GUARDRAIL_MODEL)<br/>log guardrail_check event"]
+    GUARD -->|out of scope| GREJECT["Append refusal (user's language)<br/>as assistant answer"]
+    GUARD -->|in scope / disabled / judge error (fail open)| INIT["Loop Controller<br/>reset loop_iteration_count = 0<br/>max_loop_iterations = MAX_LOOP_ITERATIONS (.env, default 5)"]
+    GREJECT --> COMPACT
     INIT --> LOOP["Loop iteration<br/>Increment loop_iteration_count"]
     LOOP --> WIN["Memory: prepare_context<br/>window recent turns, summarize older,<br/>digest oversized tool data"]
     WIN --> PLAN["Planner: LLM Call<br/>system prompt + tool schemas + windowed context"]
@@ -145,6 +153,12 @@ Key rules encoded in this diagram:
 - The loop only exits three ways: (a) LLM calls the `finalize` tool, (b)
   `loop_iteration_count` hits `max_loop_iterations` → forced finalize, (c) an
   unrecoverable exception → graceful fallback. There is no other exit path.
+- **The input guardrail runs once, before the loop begins**, not per loop
+  iteration. An out-of-scope request short-circuits to a refusal without ever
+  entering the planner loop (so it costs one small-model call, not a full
+  planner round-trip). It is toggled by `GUARDRAIL_ENABLED` (`.env`, default
+  `true`) and **fails open** — a judge-call error lets the request through to
+  the loop rather than blocking a legitimate user. See 2.0.
 - Session context is **loaded from the DB at the start of the request** and
   **persisted back at the end** (finalize, forced finalize, or fallback) —
   the loop never holds a session's memory only in process memory across
@@ -160,6 +174,36 @@ Key rules encoded in this diagram:
 ---
 
 ## 2. Agent components & business logic
+
+### 2.0 Input Guardrail (`backend/app/agent/guardrail.py`)
+- Responsibility: classify whether the user's message is within the system's
+  scope (real estate listings and marketing campaigns data only) before any
+  planner loop iteration is spent. Returns `GuardrailDecision(allowed, message)`.
+- Runs **once per request**, inside `loop_controller.run()`, after the user
+  entry is appended to context and before the `while True` planner loop. An
+  out-of-scope decision short-circuits the loop: the refusal is appended as
+  the assistant answer and returned immediately — no planner call, no tool
+  call, no loop iteration consumed.
+- Uses a **separate, smaller model** (`GUARDRAIL_MODEL`, default
+  `llama-3.1-8b-instant`) distinct from the planner's `LLM_MODEL`. Scope
+  classification is a binary task that does not require the planner model's
+  tool-orchestration capacity; a smaller model keeps the added per-request
+  latency and cost low. See `DECISIONS.md` §9.
+- The refusal message is written in the **same language as the user's input**
+  (the judge is instructed to match the user's language), so an Arabic
+  off-topic question receives an Arabic refusal.
+- **Fails open**: if the judge LLM call errors (network, rate-limit, etc.),
+  `GuardrailDecision(allowed=True)` is returned and the request continues to
+  the planner loop, which is itself scope-constrained by the system prompt.
+  A transient classifier error must never block a legitimate user.
+- Toggled by `GUARDRAIL_ENABLED` (`.env`, default `true`). When disabled,
+  `check_scope` is not called and the loop proceeds directly to the planner.
+- Logs a distinct `guardrail_check` event via `log_guardrail_event` (allowed,
+  model, optional error tag — never the message text), so every request's
+  guardrail outcome is traceable by `request_id` alongside the other agent
+  log lines.
+- Routes through `call_llm` (the existing single choke point) so it inherits
+  retry, backoff, cost logging, and `request_id` correlation for free.
 
 ### 2.1 Planner (`backend/app/agent/planner.py`)
 - Responsibility: single LLM call per loop iteration. Input = system prompt + tool

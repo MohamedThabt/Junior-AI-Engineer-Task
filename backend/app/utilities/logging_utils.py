@@ -147,6 +147,26 @@ def log_security_event(*, request_id: str, pattern_type: str) -> None:
     )
 
 
+def log_guardrail_event(
+    *, request_id: str, allowed: bool, model: str, error: str | None = None
+) -> None:
+    """Distinct log line for the pre-planner input guardrail decision.
+
+    Records only whether the request was allowed through, the classifier
+    model used, and an optional error tag — never the user's message text,
+    keeping the same "reconstruct the run by request_id" story as the other
+    agent log lines."""
+    _emit(
+        {
+            "event": "guardrail_check",
+            "request_id": request_id,
+            "allowed": allowed,
+            "model": model,
+            "error": error,
+        }
+    )
+
+
 def log_session_event(event: str, session_id: str, request_id: str, is_new: bool) -> None:
     """Distinct milestone log for session start/resume — the anchor line for
     tracing a full request end-to-end by `request_id`."""

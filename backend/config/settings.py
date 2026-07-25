@@ -38,10 +38,18 @@ class Settings(BaseSettings):
     llm_model: str = Field(default="llama-3.3-70b-versatile", alias="LLM_MODEL")
     groq_api_key: str = Field(default="", alias="GROQ_API_KEY")
 
+    # Input-guardrail model: a smaller/faster model than LLM_MODEL, used only
+    # for the pre-planner scope classification. Kept separate so the guardrail's
+    # added latency/cost stays low regardless of which (larger) model the
+    # planner loop uses. Toggle the whole check with GUARDRAIL_ENABLED.
+    guardrail_enabled: bool = Field(default=True, alias="GUARDRAIL_ENABLED")
+    guardrail_model: str = Field(default="llama-3.1-8b-instant", alias="GUARDRAIL_MODEL")
+
     # Static per-model pricing table ($ per 1K tokens), used to compute
     # cost_usd for every LLM call without any external pricing lookup.
     PRICING: dict = {
         "llama-3.3-70b-versatile": {"input_per_1k": 0.00059, "output_per_1k": 0.00079},
+        "llama-3.1-8b-instant": {"input_per_1k": 0.00005, "output_per_1k": 0.00008},
     }
 
     model_config = SettingsConfigDict(

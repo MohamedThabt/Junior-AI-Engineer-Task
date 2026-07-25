@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import time
 
-from app.agent import executor, memory, planner
+from app.agent import executor, guardrail, memory, planner
 from app.agent.finalize import forced_finalize, graceful_fallback, run_finalize
 from app.agent.prompts import build_system_prompt
 from app.repositories.chat_session_repository import ChatSessionRepository
@@ -65,6 +65,15 @@ def run(session_id: str | None, user_message: str, request_id: str) -> tuple[str
     system_prompt = build_system_prompt(max_loop_iterations)
 
     try:
+        # Input guardrail: judge scope before spending any planner loop
+        # iterations. Runs inside the try/finally so a refusal is still
+        # persisted to the session (and can never leak a stack trace).
+        if settings.guardrail_enabled:
+            scope = guardrail.check_scope(user_message, request_id)
+            if not scope.allowed:
+                context.append(memory.assistant_answer_entry(scope.message, request_id))
+                return scope.message, resolved_session_id
+
         result = None
         while True:
             loop_iteration_count += 1
