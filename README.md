@@ -215,41 +215,11 @@ pytest
 The test suite uses an in-memory SQLite database and does not modify
 `backend/db/app.db`.
 
-## Evaluating the agent
-
-Beyond the unit tests, the repository includes a curated behavioral evaluation
-suite for the conversational agent:
-[Agent Evaluation Questions](docs/agent-evaluation-questions.md).
-
-Where `pytest` verifies the individual components, this suite exercises the
-agent end to end and grades the qualities that matter for an LLM-driven system:
-correct tool selection, sound post-tool reasoning, and — most importantly —
-honesty under pressure. Every prompt is grounded in the seeded database, with
-expected tool calls, ground-truth values, and a scoring rubric. The cases are
-grouped by intent:
-
-- **Single-tool queries** — each read tool is reachable and returns correct data.
-- **Post-tool operations** — aggregations (sum, average, count, min/max) the
-  agent must compute itself, including cases that expose the 50-row query cap.
-- **Non-existent targets** — deleting or updating records that do not exist must
-  surface the tool error, never a fabricated success.
-- **Ambiguous targets** — a delete request matching many records must trigger a
-  clarification rather than a guessed or bulk action.
-- **Out-of-scope requests** — tasks with no supporting tool or data must be
-  declined honestly instead of hallucinated.
-
-To run an evaluation, seed the database, start the API, and send each prompt
-through the chat endpoint (or the UI), then grade the response against the
-documented expectation. Because a few cases are intentionally destructive, run
-them against a re-seedable database.
-
 ## Documentation
 
 - [System Design](DESIGN.md) — repository map and component boundaries
 - [Agent Architecture](docs/agent-architecture.md) — request lifecycle,
   planner, executor, tools, sessions, logging, and safeguards
-- [Agent Evaluation Questions](docs/agent-evaluation-questions.md) — behavioral
-  test suite for tool selection, aggregation, ambiguity handling, and honesty
 - [Product Requirements Document](docs/PRD.md) — product scope and user flows
 - [Architecture Decisions](DECISIONS.md) — key technical trade-offs
 - [Backend README](backend/README.md) — backend-specific setup and structure
