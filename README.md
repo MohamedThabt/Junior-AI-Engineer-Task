@@ -1,93 +1,129 @@
-# 📊 AI Excel Assistant — Junior AI Engineer Task
+# AI Excel Assistant
 
-An AI-powered conversational assistant that reads, queries, inserts, modifies, and deletes data from Excel files (`Real Estate Listings.xlsx` and `Marketing Campaigns.xlsx`) using custom ReAct-style tools built **strictly from scratch** in Python (no LangChain, LlamaIndex, AutoGen, or CrewAI).
+A full-stack conversational assistant for exploring and managing two Excel
+datasets: real-estate listings and marketing campaigns. Ask a question in
+plain language and the agent selects validated, purpose-built tools to query,
+add, update, or delete the corresponding SQLite records.
 
-This is a monorepo split into a Python/FastAPI **backend**, a React/Vite **frontend**, and top-level **docs**. See [`DESIGN.md`](DESIGN.md) for the high-level system design and how the pieces fit together.
+The agent runtime is implemented in plain Python. It does not use LangChain,
+LlamaIndex, AutoGen, CrewAI, or another agent framework.
 
----
+## What it does
 
-## 📁 Repository Layout
+- Queries real-estate listings and marketing campaigns with natural language
+- Creates, updates, and deletes records through typed tool inputs
+- Persists conversation context in SQLite sessions
+- Seeds the local database from the supplied Excel workbooks
+- Displays the conversation, sessions, and agent execution details in a React UI
+- Applies request validation, PII/secret detection, rate limiting, structured
+  logging, tool retries, and a bounded agent loop
 
-```text
-.
-├── backend/              # FastAPI app, ReAct agent loop, SQLite data layer, tests
-│   └── README.md         # Backend-specific setup, run & test instructions
-├── frontend/              # React (Vite) chat UI
-│   └── README.md         # Frontend-specific setup & run instructions
-├── docs/                  # Product & architecture documentation
-│   ├── PRD.md             # Product Requirements Document & Mermaid workflows
-│   ├── TECHNICAL_SPEC.md  # Early technical spec draft (superseded by DESIGN.md/agent-architecture.md)
-│   ├── agent-architecture.md # Authoritative agent runtime spec (planner/executor/loop/tools)
-│   └── issues/            # Historical per-feature implementation tickets
-├── README.md              # You are here — project overview & quick start
-├── DESIGN.md               # High-level system design (start here for architecture)
-└── DECISIONS.md            # Architecture decisions & trade-offs log
+## Architecture at a glance
+
+```mermaid
+flowchart LR
+    UI[React + Vite UI] -->|HTTP/JSON| API[FastAPI API]
+    API --> Guard[Validation, PII scan, rate limiting]
+    Guard --> Agent[Planner → executor → tools]
+    Agent <-->|tool calls| LLM[Groq LLM]
+    Agent --> Repositories[SQLite repositories]
+    Repositories --> DB[(SQLite database)]
+    Excel[Excel workbooks] -->|seed| DB
 ```
 
-Each part of the repo owns its own setup instructions — this file only covers
-the fastest path to running the whole stack locally. For details, see
-[`backend/README.md`](backend/README.md) and [`frontend/README.md`](frontend/README.md).
+The backend migrates and seeds data into SQLite. The Excel files are source
+data, not the files modified during chat. The seeder updates source rows by
+their IDs; deleting the database before seeding performs a full reset.
 
----
+For the detailed request lifecycle and tool design, see
+[Agent Architecture](docs/agent-architecture.md).
 
-## ⚡ Quick Start & Run Guide
+## Tech stack
 
-### 1. Prerequisites
-- **Python 3.10+** and **Node.js 18+** installed
+- Backend: Python 3.10+, FastAPI, Pydantic, SQLite, pandas, and pytest
+- Agent: from-scratch ReAct-style planner/executor loop with Groq function calling
+- Frontend: React 18, Vite, Tailwind CSS, and Lucide
+- Data: `Real Estate Listings.xlsx` and `Marketing Campaigns.xlsx`
+
+## Quick start
+
+### Prerequisites
+
+- Python 3.10 or later
+- Node.js 18 or later
 - Git
 
-### 2. Clone & Set Up the Backend
+### 1. Clone and prepare the backend
 
 ```bash
-# Clone the repository
-git clone <your-github-repo-url>
+git clone <your-github-repository-url>
 cd Junior-AI-Engineer-Task
 
-# Create & activate a virtual environment
 python -m venv venv
-# Windows (PowerShell):
-.\venv\Scripts\Activate.ps1
-# Windows (CMD):
-.\venv\Scripts\activate.bat
-# macOS / Linux:
-source venv/bin/activate
+```
 
-# All backend commands run from backend/ from here on
+Activate the virtual environment:
+
+```powershell
+# Windows PowerShell
+.\venv\Scripts\Activate.ps1
+```
+
+```bash
+# macOS / Linux
+source venv/bin/activate
+```
+
+Install backend dependencies:
+
+```bash
 cd backend
 pip install -r requirements.txt
 ```
 
-### 3. Configure Environment Variables
+### 2. Configure the application
+
+Create a local environment file from the example:
+
+```powershell
+# Windows PowerShell, from backend/
+Copy-Item .env.example .env
+```
 
 ```bash
-# Windows (PowerShell):
-Copy-Item .env.example .env
-# macOS / Linux:
+# macOS / Linux, from backend/
 cp .env.example .env
 ```
 
-*(Optional)* Set your free Groq API key inside `backend/.env`:
+Add a Groq API key to `backend/.env` to use the chat agent:
+
 ```env
 LLM_PROVIDER=groq
-GROQ_API_KEY=your_free_groq_api_key_here
+GROQ_API_KEY=your_groq_api_key
 ```
 
-### 4. Initialize & Seed the SQLite Database
+`MAX_STEPS`, `TOOL_TIMEOUT_SECONDS`, the model name, and logging level are also
+configured in this file. See [`backend/.env.example`](backend/.env.example) for
+the complete list.
+
+### 3. Seed the database and start the API
+
+From `backend/`:
 
 ```bash
 python -m db.seed_database
-```
-
-### 5. Run the Backend
-
-```bash
 uvicorn main:app --reload --port 8000
 ```
 
-- 🔌 **FastAPI Interactive Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- 🟢 **API Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+The API is now available at:
 
-### 6. Run the Frontend (in a separate terminal)
+- API documentation: http://localhost:8000/docs
+- Health check: http://localhost:8000/api/health
+- Chat endpoint: `POST http://localhost:8000/api/agent/chat`
+
+### 4. Start the frontend
+
+Open a second terminal at the repository root:
 
 ```bash
 cd frontend
@@ -95,46 +131,104 @@ npm install
 npm run dev
 ```
 
-- 🌐 **Chat UI**: [http://localhost:3000](http://localhost:3000)
+Open http://localhost:3000. The Vite development server proxies `/api` requests
+to `http://127.0.0.1:8000` by default.
 
-See [`frontend/README.md`](frontend/README.md) for how to point the UI at a different backend URL.
+## Using the assistant
 
----
-
-## 💬 Example Natural Language Queries
-
-Try asking the assistant queries like:
-
-### 🏠 Real Estate Dataset (`LST-XXXX`)
-- **Query**: `"Show all houses in Illinois under $400,000"`
-- **Insert**: `"Add a new property: 4 bed, 3.5 bath house in Austin, Texas listed for $650,000"`
-- **Update**: `"Update listing LST-5001 status to Sold and set sale price to $360,000"`
-- **Delete**: `"Delete listing LST-5002"`
-- **Aggregate**: `"What is the average listing price by state?"`
-
-### 📈 Marketing Campaigns Dataset (`CMP-XXXX`)
-- **Query**: `"Which campaign generated the highest revenue?"`
-- **Insert**: `"Create a new campaign named 'Fall Sale' on Facebook with budget $15,000"`
-- **Update**: `"Change the budget allocated for CMP-8001 to $30,000"`
-- **Delete**: `"Delete campaign CMP-8003"`
-- **Aggregate**: `"Calculate the total amount spent across all channels"`
-
----
-
-## 📚 Project Documentation
-
-- [🗺️ System Design (DESIGN.md)](DESIGN.md) — start here for the big picture
-- [🧠 Agent Architecture](docs/agent-architecture.md) — planner/executor/loop, logging, tool inventory
-- [📄 Product Requirements Document (PRD)](docs/PRD.md)
-- [🧾 Architectural Decisions & Trade-offs](DECISIONS.md)
-- [🖥️ Backend README](backend/README.md)
-- [🎨 Frontend README](frontend/README.md)
-
----
-
-## 🧪 Running Tests
+The chat UI is the simplest way to use the project. You can also call the API
+directly:
 
 ```bash
-cd backend
+curl -X POST http://localhost:8000/api/agent/chat \
+  -H "Content-Type: application/json" \
+  -d "{\"message\":\"Show all houses in Illinois under $400,000\"}"
+```
+
+The response includes an answer and a `session_id`. Pass that ID in later
+requests to continue the same conversation:
+
+```json
+{
+  "session_id": "existing-session-id",
+  "message": "Now show only the available listings."
+}
+```
+
+### Example prompts
+
+**Real estate**
+
+- `Show all houses in Illinois under $400,000`
+- `Add a new property: 4 bed, 3.5 bath house in Austin, Texas listed for $650,000`
+- `Update listing LST-5001 status to Sold and set sale price to $360,000`
+- `Delete listing LST-5002`
+
+**Marketing campaigns**
+
+- `Which campaign generated the highest revenue?`
+- `Create a new campaign named "Fall Sale" on Facebook with budget $15,000`
+- `Change the budget allocated for CMP-8001 to $30,000`
+- `Calculate the total amount spent across all channels`
+
+## API surface
+
+- `GET /api/health` — verify that the API is running
+- `POST /api/agent/chat` — send a message, optionally with a `session_id`
+- `POST /api/sessions/` — create a named session
+- `GET /api/sessions/` — list sessions
+- `GET /api/sessions/{session_id}` — retrieve a session and its context
+- `DELETE /api/sessions/{session_id}` — delete a session
+
+Use the OpenAPI UI at `/docs` for request and response schemas.
+
+## Project layout
+
+```text
+.
+├── backend/       # FastAPI app, agent runtime, tools, SQLite layer, tests
+├── frontend/      # React/Vite chat application
+├── docs/          # Product, architecture, and historical implementation docs
+├── DESIGN.md      # System map and repository-level architecture
+├── DECISIONS.md   # Architecture decisions and trade-offs
+└── README.md      # Project overview and full-stack quick start
+```
+
+Component-specific setup and development information lives in
+[`backend/README.md`](backend/README.md) and
+[`frontend/README.md`](frontend/README.md).
+
+## Running tests
+
+From `backend/`:
+
+```bash
 pytest
 ```
+
+The test suite uses an in-memory SQLite database and does not modify
+`backend/db/app.db`.
+
+## Documentation
+
+- [System Design](DESIGN.md) — repository map and component boundaries
+- [Agent Architecture](docs/agent-architecture.md) — request lifecycle,
+  planner, executor, tools, sessions, logging, and safeguards
+- [Product Requirements Document](docs/PRD.md) — product scope and user flows
+- [Architecture Decisions](DECISIONS.md) — key technical trade-offs
+- [Backend README](backend/README.md) — backend-specific setup and structure
+- [Frontend README](frontend/README.md) — frontend setup and UI details
+
+## Troubleshooting
+
+**The chat endpoint cannot reach the LLM**<br>
+Confirm that `GROQ_API_KEY` is present in `backend/.env`, then restart Uvicorn.
+
+**The frontend cannot call the API**<br>
+Start the backend on port `8000`. When using the Vite server, requests to
+`/api` are proxied to `http://127.0.0.1:8000`.
+
+**You want a clean dataset**<br>
+Stop the API, delete `backend/db/app.db`, then run `python -m db.seed_database`
+from `backend/`. The seeder alone refreshes rows in the source workbooks but
+does not remove records created during chat.
