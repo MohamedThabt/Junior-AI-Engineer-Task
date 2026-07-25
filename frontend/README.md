@@ -2,7 +2,7 @@
 
 A React application built with **Vite**, **Tailwind CSS**, **Lucide Icons**, and **Shadcn/UI components** implementing Framer's near-pure black marketing & dashboard design system.
 
-The frontend consumes the exact same backend endpoints (`/api/health`, `/api/sessions/`, etc.) that the Gradio UI in `ui/api_client.py` connects to.
+The frontend consumes the FastAPI backend's REST endpoints (`/api/health`, `/api/agent/chat`, `/api/sessions/`, etc.) — see [`../backend/README.md`](../backend/README.md) for how to run it, and [`../docs/agent-architecture.md`](../docs/agent-architecture.md) for the full request/response contract.
 
 ---
 
@@ -64,20 +64,27 @@ frontend/
     ├── main.jsx             # React DOM root
     ├── App.jsx              # Main Dashboard app container
     ├── lib/
-    │   ├── api.js           # HTTP Client for FastAPI endpoints
+    │   ├── api.js           # HTTP client for FastAPI endpoints + PII pre-flight scan
     │   └── utils.js         # Tailwind cn helper & formatters
     └── components/
-        ├── TopNav.jsx       # Sticky header with API status pulse & settings
-        ├── Hero.jsx         # Poster headline & quick metric tiles
-        ├── SessionManager.jsx # Interactive session CRUD dashboard
-        ├── AgentSpotlights.jsx # 4 Atmospheric gradient showcase cards
-        ├── ApiDiagnostics.jsx # Live payload inspector & route tester
-        ├── Footer.jsx       # Framer monochrome footer
-        └── ui/              # Shadcn / Framer design system UI components
-            ├── Button.jsx   # White pill, charcoal pill, translucent, circular icon
-            ├── Input.jsx    # Text input with sky-blue focus halo
-            ├── Card.jsx     # Surface-1 and Surface-2 cards
+        ├── TopNav.jsx               # Sticky header with API status pulse & settings
+        ├── Hero.jsx                 # Poster headline & quick metric tiles
+        ├── AgentSidebar.jsx         # Session list / navigation sidebar
+        ├── AgentChatView.jsx        # Main chat window (messages, input, send)
+        ├── AgentExecutionTrace.jsx  # Step-by-step planner/tool execution trace
+        ├── AgentSpotlights.jsx      # Atmospheric gradient showcase cards
+        ├── SessionManager.jsx       # Interactive session CRUD dashboard
+        ├── SessionContextViewer.jsx # Raw persisted session context inspector
+        ├── ToolRegistryDrawer.jsx   # Tool schema / registry inspector
+        ├── DomainDataDrawer.jsx     # Real estate / campaigns schema reference
+        ├── ApiDiagnostics.jsx       # Live payload inspector & route tester
+        ├── MarkdownRenderer.jsx     # Renders agent answers as formatted markdown
+        ├── Footer.jsx               # Framer monochrome footer
+        └── ui/                      # Shadcn / Framer design system UI primitives
+            ├── Button.jsx       # White pill, charcoal pill, translucent, circular icon
+            ├── Input.jsx        # Text input with sky-blue focus halo
+            ├── Card.jsx         # Surface-1 and Surface-2 cards
             ├── SpotlightCard.jsx # Atmospheric gradient spotlight card wrapper
-            ├── Badge.jsx    # Micro chips & status indicators
-             font-mono text-emerald-400
+            ├── Badge.jsx        # Micro chips & status indicators
+            └── Modal.jsx        # Dialog / modal overlay
 ```

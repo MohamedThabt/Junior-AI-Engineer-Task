@@ -1,5 +1,8 @@
 # Architecture Decisions
 
+> File paths below (`app/...`, `db/...`, `tests/...`) are relative to
+> `backend/` — see [`DESIGN.md`](DESIGN.md) for the top-level repo layout.
+
 ## 1. Idempotency on internal retries
 - **Decision:** check-before-write is the only idempotency mechanism — no idempotency-key system. `insert_real_estate`/`insert_campaign` call `Repository.exists(id)` immediately before the `INSERT`; `update_*`/`delete_*` call `Repository.exists(id)` immediately before the `UPDATE`/`DELETE`. This check-then-act sequence, plus the write's own `UNIQUE` constraint on the primary key, runs *inside* the same `run_with_retry` attempt as the write itself.
 - **Alternatives considered:**

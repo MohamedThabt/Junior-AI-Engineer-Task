@@ -2,77 +2,102 @@
 
 An AI-powered conversational assistant that reads, queries, inserts, modifies, and deletes data from Excel files (`Real Estate Listings.xlsx` and `Marketing Campaigns.xlsx`) using custom ReAct-style tools built **strictly from scratch** in Python (no LangChain, LlamaIndex, AutoGen, or CrewAI).
 
+This is a monorepo split into a Python/FastAPI **backend**, a React/Vite **frontend**, and top-level **docs**. See [`DESIGN.md`](DESIGN.md) for the high-level system design and how the pieces fit together.
+
+---
+
+## 📁 Repository Layout
+
+```text
+.
+├── backend/              # FastAPI app, ReAct agent loop, SQLite data layer, tests
+│   └── README.md         # Backend-specific setup, run & test instructions
+├── frontend/              # React (Vite) chat UI
+│   └── README.md         # Frontend-specific setup & run instructions
+├── docs/                  # Product & architecture documentation
+│   ├── PRD.md             # Product Requirements Document & Mermaid workflows
+│   ├── TECHNICAL_SPEC.md  # Early technical spec draft (superseded by DESIGN.md/agent-architecture.md)
+│   ├── agent-architecture.md # Authoritative agent runtime spec (planner/executor/loop/tools)
+│   └── issues/            # Historical per-feature implementation tickets
+├── README.md              # You are here — project overview & quick start
+├── DESIGN.md               # High-level system design (start here for architecture)
+└── DECISIONS.md            # Architecture decisions & trade-offs log
+```
+
+Each part of the repo owns its own setup instructions — this file only covers
+the fastest path to running the whole stack locally. For details, see
+[`backend/README.md`](backend/README.md) and [`frontend/README.md`](frontend/README.md).
+
 ---
 
 ## ⚡ Quick Start & Run Guide
 
 ### 1. Prerequisites
-- **Python 3.10+** installed
+- **Python 3.10+** and **Node.js 18+** installed
 - Git
 
-### 2. Clone & Setup Virtual Environment
+### 2. Clone & Set Up the Backend
 
 ```bash
 # Clone the repository
 git clone <your-github-repo-url>
 cd Junior-AI-Engineer-Task
 
-# Create a virtual environment
+# Create & activate a virtual environment
 python -m venv venv
-
-# Activate virtual environment
 # Windows (PowerShell):
 .\venv\Scripts\Activate.ps1
 # Windows (CMD):
 .\venv\Scripts\activate.bat
 # macOS / Linux:
 source venv/bin/activate
-```
 
-### 3. Install Dependencies
-
-```bash
+# All backend commands run from backend/ from here on
+cd backend
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
-
-Copy the `.env.example` template to `.env`:
+### 3. Configure Environment Variables
 
 ```bash
 # Windows (PowerShell):
 Copy-Item .env.example .env
-
 # macOS / Linux:
 cp .env.example .env
 ```
 
-*(Optional)* Set your free Groq API key inside `.env` if required by your setup:
+*(Optional)* Set your free Groq API key inside `backend/.env`:
 ```env
 LLM_PROVIDER=groq
 GROQ_API_KEY=your_free_groq_api_key_here
 ```
 
-### 5. Initialize & Seed SQLite Database
-
-Run the seeder script to apply database migrations and populate SQLite tables from the Excel files:
+### 4. Initialize & Seed the SQLite Database
 
 ```bash
 python -m db.seed_database
 ```
 
-### 6. Run the Application
-
-Launch the FastAPI backend along with the integrated Gradio Web UI:
+### 5. Run the Backend
 
 ```bash
 uvicorn main:app --reload --port 8000
 ```
 
-Once running, access the interfaces in your browser:
-- 🌐 **Gradio Web UI**: [http://localhost:8000/ui](http://localhost:8000/ui)
 - 🔌 **FastAPI Interactive Docs**: [http://localhost:8000/docs](http://localhost:8000/docs)
-- 🟢 **API Health Check**: [http://localhost:8000/](http://localhost:8000/)
+- 🟢 **API Health Check**: [http://localhost:8000/api/health](http://localhost:8000/api/health)
+
+### 6. Run the Frontend (in a separate terminal)
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+- 🌐 **Chat UI**: [http://localhost:3000](http://localhost:3000)
+
+See [`frontend/README.md`](frontend/README.md) for how to point the UI at a different backend URL.
 
 ---
 
@@ -96,55 +121,20 @@ Try asking the assistant queries like:
 
 ---
 
-## 📁 Directory Structure
-
-```text
-.
-├── app/
-│   ├── api/              # FastAPI route definitions (agent chat, sessions)
-│   ├── controllers/      # REST API route handlers
-│   ├── agent/            # ReAct agent loop: planner, executor, loop controller,
-│   │                     #   LLM client (app/agent/llm_client.py) & LLM provider
-│   │                     #   factory (app/agent/llm_factory.py, Groq today)
-│   ├── tools/            # LLM-callable tools (query/insert/update/delete + finalize)
-│   ├── repositories/     # SQLite Data access layer (Real Estate, Marketing, Chat Session)
-│   ├── models/           # Data schemas & validation models (Pydantic DTOs)
-│   └── utilities/        # Structured agent logging, query filter evaluators & PII scanning
-├── config/               # Logging, limiter & environment settings
-├── data/                 # Data directory containing Excel source files
-│   ├── Real Estate Listings.xlsx
-│   └── Marketing Campaigns.xlsx
-├── db/                   # Database layer (SQLite migrations, connection factory & seeder)
-│   ├── app.db            # Generated SQLite database file
-│   ├── database.py       # Connection factory and migration runner
-│   ├── seed_database.py  # Seeder script parsing Excel files into SQLite
-│   └── migrations/       # SQL migration scripts
-├── docs/                 # Full documentation
-│   ├── PRD.md            # Product Requirements Document & Mermaid Workflows
-│   └── TECHNICAL_SPEC.md # Architecture & ReAct Sequence Diagrams
-├── routes/               # API Router configuration
-├── ui/                   # Gradio Web Interface component
-├── main.py               # Application entry point (FastAPI + Gradio)
-├── requirements.txt      # Pinned dependencies
-├── .env.example          # Environment variables template
-└── DECISIONS.md          # Architectural decisions and trade-offs
-```
-
----
-
 ## 📚 Project Documentation
 
-For deeper details regarding architecture, design choices, and flowcharts:
+- [🗺️ System Design (DESIGN.md)](DESIGN.md) — start here for the big picture
+- [🧠 Agent Architecture](docs/agent-architecture.md) — planner/executor/loop, logging, tool inventory
 - [📄 Product Requirements Document (PRD)](docs/PRD.md)
-- [🛠️ Technical Specifications & Diagrams](docs/TECHNICAL_SPEC.md)
-- [🧠 Architectural Decisions & Tradeoffs](DECISIONS.md)
+- [🧾 Architectural Decisions & Trade-offs](DECISIONS.md)
+- [🖥️ Backend README](backend/README.md)
+- [🎨 Frontend README](frontend/README.md)
 
 ---
 
 ## 🧪 Running Tests
 
-To run the automated backend test suite:
-
 ```bash
+cd backend
 pytest
 ```
