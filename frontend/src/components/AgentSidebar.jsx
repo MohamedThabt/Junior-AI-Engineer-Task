@@ -7,7 +7,6 @@ import {
   Search, 
   ChevronLeft, 
   ChevronRight,
-  SlidersHorizontal,
   FlaskConical,
   Wrench,
   Cpu
@@ -24,7 +23,6 @@ export function AgentSidebar({
   onRefreshHealth,
   isCollapsed,
   setIsCollapsed,
-  onOpenSettings,
   onOpenContextViewer,
   onOpenEvalSuite,
   onOpenToolRegistry
@@ -166,13 +164,6 @@ export function AgentSidebar({
               title="DB Context Memory"
             >
               <Cpu className="w-4 h-4 text-slate-800" />
-            </button>
-            <button 
-              onClick={onOpenSettings} 
-              className="hover:text-slate-900 hover:bg-slate-100 p-2 rounded-lg transition-all"
-              title="API Settings"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
             </button>
           </div>
         </>

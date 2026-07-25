@@ -43,10 +43,6 @@ export default function App() {
   const [isEvalSuiteOpen, setIsEvalSuiteOpen] = useState(false)
   const [isToolRegistryOpen, setIsToolRegistryOpen] = useState(false)
 
-  // API Settings Modal state
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false)
-  const [customApiUrl, setCustomApiUrl] = useState(getStoredBaseUrl())
-
   // Prompt prefill signal — picking an eval-suite prompt only fills the chat
   // composer, it never auto-sends. `prefillNonce` forces the effect in
   // AgentChatView to re-fire even if the same prompt text is chosen twice.
@@ -259,15 +255,6 @@ export default function App() {
     }))
   }
 
-  // Save Settings
-  const handleSaveSettings = (e) => {
-    e.preventDefault()
-    setStoredBaseUrl(customApiUrl)
-    setIsSettingsOpen(false)
-    checkHealth()
-    fetchSessions()
-  }
-
   // Initial load
   useEffect(() => {
     checkHealth()
@@ -285,7 +272,6 @@ export default function App() {
         onOpenEvalSuite={() => setIsEvalSuiteOpen(true)}
         onOpenToolRegistry={() => setIsToolRegistryOpen(true)}
         onOpenContextViewer={() => setIsContextViewerOpen(true)}
-        onOpenSettings={() => setIsSettingsOpen(true)}
         healthStatus={healthStatus}
         onRefreshHealth={checkHealth}
       />
@@ -303,7 +289,6 @@ export default function App() {
           onRefreshHealth={checkHealth}
           isCollapsed={isSidebarCollapsed}
           setIsCollapsed={setIsSidebarCollapsed}
-          onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenContextViewer={() => setIsContextViewerOpen(true)}
           onOpenEvalSuite={() => setIsEvalSuiteOpen(true)}
           onOpenToolRegistry={() => setIsToolRegistryOpen(true)}
@@ -392,44 +377,6 @@ export default function App() {
         </form>
       </Modal>
 
-      {/* Settings Modal */}
-      <Modal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        title="Configure Backend API Gateway"
-        description="Set the base URL for the FastAPI agent backend server."
-      >
-        <form onSubmit={handleSaveSettings} className="space-y-4">
-          <div>
-            <label className="block text-xs font-medium text-[#4e4e4e] mb-2">
-              API Base Endpoint URL
-            </label>
-            <Input
-              value={customApiUrl}
-              onChange={(e) => setCustomApiUrl(e.target.value)}
-              placeholder="(leave empty to use built-in proxy)"
-            />
-          </div>
-
-          <div className="flex justify-end space-x-3 pt-4 border-t border-[#e7e5e4]">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsSettingsOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              variant="primary"
-              size="sm"
-            >
-              Save & Test Connection
-            </Button>
-          </div>
-        </form>
-      </Modal>
     </div>
   )
 }

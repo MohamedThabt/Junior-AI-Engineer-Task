@@ -5,7 +5,6 @@ import {
   Wrench, 
   Cpu, 
   Plus, 
-  SlidersHorizontal, 
   RefreshCw 
 } from "lucide-react"
 
@@ -14,7 +13,6 @@ export function TopNav({
   onOpenEvalSuite, 
   onOpenToolRegistry, 
   onOpenContextViewer,
-  onOpenSettings,
   healthStatus,
   onRefreshHealth
 }) {
@@ -69,7 +67,7 @@ export function TopNav({
       <div className="flex items-center space-x-3">
         {/* Gateway Health Indicator */}
         <button
-          onClick={onRefreshHealth || onOpenSettings}
+          onClick={onRefreshHealth}
           className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono border transition-all ${
             healthStatus?.ok
               ? "bg-emerald-50 border-emerald-200 text-emerald-900 hover:bg-emerald-100 shadow-2xs"
