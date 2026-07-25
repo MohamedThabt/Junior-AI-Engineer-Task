@@ -586,7 +586,7 @@ project_root/
 │   ├── requirements.txt
 │   └── README.md                # backend-specific setup/run/test instructions
 ├── frontend/                     # React (Vite) chat UI — see frontend/README.md
-├── docs/                         # PRD, technical spec, this file, per-feature issue tickets
+├── docs/                         # PRD, architecture spec
 ├── README.md                     # project overview, quick start
 ├── DESIGN.md                     # high-level system design (this repo's map)
 └── DECISIONS.md                  # architecture decisions & trade-offs log

@@ -246,7 +246,7 @@ export function AgentChatView({
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '150ms' }} />
                     <div className="w-2 h-2 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: '300ms' }} />
                   </div>
-                  <span className="font-sans font-medium text-slate-700">Executing agent reasoning loop...</span>
+                  <span className="font-sans font-medium text-slate-700">Thinking...</span>
                 </div>
               </div>
             )}
