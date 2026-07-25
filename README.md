@@ -8,6 +8,10 @@ add, update, or delete the corresponding SQLite records.
 The agent runtime is implemented in plain Python. It does not use LangChain,
 LlamaIndex, AutoGen, CrewAI, or another agent framework.
 
+## Demo
+
+![Demo example of running agent](assets/image.png)
+
 ## What it does
 
 - Queries real-estate listings and marketing campaigns with natural language
