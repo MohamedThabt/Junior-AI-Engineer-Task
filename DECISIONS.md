@@ -1,102 +1,104 @@
 # Architecture Decisions
 
-> File paths below (`app/...`, `db/...`, `tests/...`) are relative to
-> `backend/` — see [`DESIGN.md`](DESIGN.md) for the top-level repo layout.
 
-## 1. Idempotency on internal retries
-- **Decision:** check-before-write is the only idempotency mechanism — no idempotency-key system. `insert_real_estate`/`insert_campaign` call `Repository.exists(id)` immediately before the `INSERT`; `update_*`/`delete_*` call `Repository.exists(id)` immediately before the `UPDATE`/`DELETE`. This check-then-act sequence, plus the write's own `UNIQUE` constraint on the primary key, runs *inside* the same `run_with_retry` attempt as the write itself.
-- **Alternatives considered:**
-  - A generated idempotency key per LLM tool call, deduplicated server-side — rejected as over-engineering for a local SQLite store with no network partition risk; the failure modes an idempotency key protects against (client retries after a dropped response, distributed duplicate submission) don't apply here.
-  - No check at all, relying on the `UNIQUE`/PK constraint to reject duplicate inserts — rejected because that alone can't distinguish "attempt 1 already succeeded" from "attempt 1 genuinely failed for another reason," and gives update/delete no way to fail fast with a clear message before touching the DB twice.
-- **Rationale:** at this scale (single-process, single local SQLite file, no concurrent writers), check-before-write is sufficient and keeps every tool's internal retry loop uniform — a repeated attempt against unchanged state always produces the same outcome (already-exists / not-found), so retrying never double-applies a write.
+## Major Decisions
 
-## 2. Row limits on read tools
-- **Decision:** `RealEstateFilters.limit`/`CampaignFilters.limit` default to `20`; `query_real_estate`/`query_campaigns` additionally clamp the *effective* limit to a hard server-side ceiling of `50` (`MAX_QUERY_LIMIT` in each tools module) regardless of what the caller requests — `min(filters.limit, MAX_QUERY_LIMIT)`.
-- **Alternatives considered:**
-  - Rejecting (validation error) any `limit > 50` instead of silently clamping — rejected because it wastes a tool-call round trip on something the tool can trivially satisfy itself; clamping still returns a useful, bounded result.
-  - No hard ceiling, trusting the model-side default of 20 — rejected: nothing stops the LLM from passing `limit=10000`, and an unbounded result dumped back into the LLM context is one of the largest avoidable sources of slow, expensive next-loop-iteration calls.
-- **Rationale:** latency/cost is the primary constraint on this loop (`MAX_LOOP_ITERATIONS`-bounded, per-call token cost logged); a small, predictable row cap keeps every tool response cheap to feed back into the next planner call.
+### 1. SQLite over Excel
+**Decision:** All persistent data is stored in SQLite (`db/app.db`); Excel files are used only as a one-time seed source.
+- SQLite provides atomic commits/rollbacks on every write; Excel has no crash-safe write guarantee — a mid-save crash can corrupt the entire workbook.
+- SQLite touches only affected pages per operation; Excel must deserialize/serialize the entire workbook even for a single-cell change, compounding cost as data grows.
+- SQLite's busy-timeout serializes concurrent writers cleanly; `openpyxl` has no locking primitive, so two simultaneous writes produce silent data loss.
+- Indexed point lookups take microseconds in SQLite; an equivalent Excel round-trip takes tens–hundreds of milliseconds regardless of change size.
 
-## 3. Write-scope safety
-- **Decision:** `update_real_estate`/`delete_real_estate` and `update_campaign`/`delete_campaign` only ever accept an exact `listing_id`/`campaign_id` — their Pydantic input models (`RealEstateUpdate`/`RealEstateDelete`/`CampaignUpdate`/`CampaignDelete`) have no filter-shaped fields (no `city`, `state`, `channel`, etc.) at all, so a broad "delete all X" request is a schema validation failure, not a possible call shape.
-- **Alternatives considered:**
-  - Accepting a filter and translating it to a `WHERE` clause for bulk update/delete — rejected outright: this is the exact mistake the architecture doc calls out as causing real data loss from an ambiguous natural-language request, and there's no legitimate use case for it in this tool set.
-- **Rationale:** making broad writes structurally impossible (rather than "discouraged by convention") means neither the LLM nor a bug in prompt-following can accidentally trigger one — the type system itself is the guardrail.
+### 2. Repository layer separated from tool layer
+**Decision:** All data access lives in `app/repositories/`; tools in `app/tools/` call repositories and never touch the DB directly.
+- Error handling, validation, and logging for the data access layer are centralized in one place, not scattered across every tool.
+- No ORM is needed — there are no relations between entities, so raw SQL via the repository is sufficient and simpler.
+- Tool logic stays focused on input parsing and response shaping; repository logic stays focused on DB correctness and retry semantics.
+- Each layer can be tested independently; a tool test can mock the repository without touching SQLite at all.
 
-## 4. Per-call timeout
-- **Decision:** use SQLite's own connection-level busy-timeout — `get_connection(timeout=settings.tool_timeout_seconds)` (`TOOL_TIMEOUT_SECONDS`, default `5.0`s) — rather than a generic thread-based timeout wrapper. A call that can't acquire a lock within the window raises `sqlite3.OperationalError`, which flows through the tool's existing `run_with_retry` loop like any other failure.
-- **Alternatives considered:**
-  - Running each repository call in a worker thread and bounding it with `.join(timeout)` — rejected: `sqlite3.Connection` objects aren't safe to use across threads by default (`check_same_thread=True`), and the test suite deliberately shares one in-memory connection across every repository call for the lifetime of a test (`tests/conftest.py`); a thread-based timeout would either break that shared-connection test harness or require weakening `check_same_thread`, adding real cross-thread-safety risk for no benefit on a local, single-writer SQLite file.
-  - No timeout at all, given SQLite's low hang risk locally — rejected as a silent gap: the architecture doc explicitly calls out lock contention as the scenario to guard against, and SQLite already ships a purpose-built mechanism for exactly that.
-- **Rationale:** the busy-timeout is the idiomatic, zero-risk way to bound *the specific failure mode SQLite can actually have* (lock contention), it requires no threading, and it needed only a one-line addition to `db/database.py`'s `get_connection()`.
+### 3. Migrations over raw SQL scripts
+**Decision:** Schema changes are applied via versioned migration files, not ad-hoc SQL scripts run manually.
+- Migrations are ordered and tracked, so the schema version is always known and reproducible across environments.
+- Raw SQL scripts have no built-in mechanism to detect whether they've already been applied, risking double-execution.
+- A migration runner makes CI/CD schema upgrades automatic; manual scripts require human coordination and are error-prone.
+- Rolling back a bad change is explicit (down migration) rather than requiring hand-written reverse SQL.
 
-## 5. LLM provider & factory design
-- **Decision:** Gemini (`gemini-3.1-flash-lite`, via the current `google-genai` SDK) is the only LLM provider actually wired up. Access goes through an `LLMProviderClient` abstract base plus a `get_llm_client(provider)` registry (`app/agent/llm_factory.py`), and `app/agent/llm_client.py`'s `call_llm(...)` is the only caller — it never talks to a provider SDK directly.
-- **Alternatives considered:**
-  - Hardcoding Anthropic, as the original scaffold draft listed — rejected: no key/requirement for it, and it would have meant shipping an untested integration.
-  - Wiring up 2-3 providers (Gemini + Anthropic + OpenAI) up front — rejected as premature: without real keys for the others, that code would be unexercised and untested, adding risk without adding value.
-  - A generic single `LLM_API_KEY` env var reused across whichever provider is active — rejected in favor of provider-specific key vars (`GEMINI_API_KEY`, etc.) so multiple providers can be configured side by side later without one overwriting another.
-- **Rationale:** the factory/registry pattern keeps every call site (planner, loop controller) provider-agnostic — they only ever see `LLMResponse`/`LLMCallError`, never a provider SDK type. Adding a second provider later is a new `LLMProviderClient` subclass and one registry entry, not a change to any existing call site. Gemini's cheapest current GA tier (`gemini-3.1-flash-lite`, $0.25 / $1.50 per 1M tokens) was chosen to minimize `cost_usd` for a latency- and cost-sensitive tool-calling loop.
+### 4. Pydantic models as the single source of truth for tool schemas
 
-## 6. Agent loop context/message format
-- **Decision:** session `context` (persisted via `ChatSessionRepository.save_context`) is a flat list of `{"role", "content"}` dicts, doubling as the `messages` list `planner.plan()` sends to `call_llm` (prefixed with one `{"role": "system", "content": system_prompt}` entry). Three entry shapes appear in it: the user's message (`role="user"`), a tool result (`role="tool"`, `content=json.dumps(tool_result.model_dump())` — the full envelope: `success`/`data`/`error`/`tool`/`attempts`), and the agent's own answer (`role="assistant"`, `content=answer`) from `run_finalize`/`forced_finalize`/`graceful_fallback`. `loop_controller.run()` also returns `(answer, resolved_session_id)` rather than a bare `answer` string, so `AgentController` can report back a server-generated `session_id` to the client.
-- **Alternatives considered:**
-  - Native Gemini function-call/function-response turns (via `google.genai.types.FunctionCall`/`FunctionResponse` parts) instead of stringified JSON in a plain text turn — rejected: `llm_factory.GeminiClient._build_contents` only builds plain text turns today, and wiring native function-call turns is a bigger, separate change to an already-complete/tested module (`llm_client.py`/`llm_factory.py`) that this work deliberately left untouched.
-  - Only appending tool results to context, never the assistant's own final answer (the literal reading of the loop pseudocode) — rejected: it would mean a resumed session remembers what the user asked and what data was fetched, but never what the agent actually told the user, breaking multi-turn conversational continuity for the most common case (a session that ends via a plain `finalize` with no tool calls at all would persist *nothing* beyond the user's message).
-  - Returning only the answer string from `loop_controller.run()`, matching the issue doc's literal signature — rejected: `AgentController` has no other way to learn a newly-created `session_id` when the client started with `session_id=None`, and the client needs that id to continue the conversation on its next request.
-- **Rationale:** reusing one simple `{"role","content"}` shape for both the persisted history and the LLM-facing messages keeps the loop controller and planner trivial (no separate serialization/deserialization step), and matches what `llm_factory.GeminiClient` already accepts without modifying that already-tested module.
+**Decision:** Every tool's input validation model (`RealEstateFilters`, `CampaignCreate`, etc.) in `app/models/schemas.py` is also the source for the LLM function-calling schema passed to the provider (`TOOL_SCHEMAS` in `app/tools/registry.py` via `model.model_json_schema()`).
 
-## 7. Switch from Gemini to Groq
-- **Decision:** replaced `GeminiClient` with `GroqClient` (`app/agent/llm_factory.py`) as the sole registered provider, wrapping the `groq` SDK's OpenAI-compatible `client.chat.completions.create(...)`. `LLM_PROVIDER`/`LLM_MODEL` default to `groq`/`llama-3.3-70b-versatile`; `GEMINI_API_KEY` is replaced by `GROQ_API_KEY`. `llm_client._parse_response` now reads the OpenAI-shaped `ChatCompletion` (`raw.usage.prompt_tokens`/`raw.choices[0].message`) instead of Gemini's `usage_metadata`/`function_calls`, and `PRICING` was repointed at Groq's published per-token rate for the new model.
-- **Alternatives considered:**
-  - Keeping both `GeminiClient` and `GroqClient` registered side by side — rejected: no working Gemini API key/environment was actually available (`google-genai` was never installed in the project venv, causing every call to fail with `No module named 'google'`), so an unused, unexercised second provider would just be dead code.
-  - Passing `context`'s `{"role": "tool", ...}` entries straight through to Groq as OpenAI `tool` messages — rejected: OpenAI/Groq's schema requires a `tool_call_id` pairing a `tool` message back to a preceding assistant `tool_calls` turn, which the flat context format (decision #6) doesn't track; `GroqClient._build_messages` instead maps `tool` (and any other non-`system`/`assistant` role) to `user`, the same simplification decision #6 already made for Gemini.
-- **Rationale:** Groq was the recommended free-tier provider and gives a fast, OpenAI-compatible tool-calling API without requiring a redesign of the existing `LLMProviderClient`/`call_llm` abstraction — only the factory's one client class and the client-agnostic response parser needed to change.
+- A single definition means the validation rules the backend enforces and the schema the LLM sees can never drift apart — adding a field or constraint in one place automatically propagates to the other.
+- No hand-written JSON schemas to maintain; Pydantic's `model_json_schema()` generates them deterministically.
+- The `_relax_numeric_params` post-processing step widens numeric fields to also accept strings in the advertised schema, working around Groq's strict tool-call validator that rejects quoted numbers even though Pydantic coerces them correctly on our side.
 
-## 8. Recovering Groq's `tool_use_failed` raw function-call errors
-- **Decision:** `GroqClient.generate` (`app/agent/llm_factory.py`) now catches `groq.BadRequestError` and, if the error body's `code` is `tool_use_failed`, tries to recover the intended call by regex-matching Llama's raw `<function=name>{...}</function>` text out of the error's `failed_generation` field and JSON-parsing the captured args (`_recover_from_tool_use_failed`); on success it returns a synthetic response shaped like a normal `ChatCompletion` so `llm_client._parse_response` consumes it unchanged, otherwise it re-raises the original error unchanged. `generate` also now passes `temperature=0` to Groq.
-- **Alternatives considered:**
-  - Relying solely on `call_llm`'s existing retry loop — rejected: retrying re-sends an unchanged request, and this failure mode was observed to repeat with cosmetically different but equally malformed output across all 3 attempts (e.g. `<function=finalize{...}</function>`, then `<function=finalize {...}</function>`), burning ~40s per attempt without ever succeeding, then falling back to the generic "something went wrong" answer even though the model's actual answer was already fully formed and present in `failed_generation` every time.
-  - Widening the tool schema further (as done in decision on `_relax_numeric_params`) — doesn't apply here: this failure isn't a schema/type mismatch, it's Groq's parser failing to convert Llama's raw text into a structured tool call at all (a missing `>` after the function name), so there is no schema change that fixes it.
-  - Regenerating with a corrective follow-up message telling the model its previous call was malformed — rejected as unnecessary complexity: the malformed text already contains a syntactically valid JSON args object in every observed case, so a client-side parse is strictly simpler and doesn't cost another LLM call.
-- **Rationale:** this failure mode has a fully-recoverable payload sitting right there in the error response — Groq's own strict parser refusing to synthesize a `tool_calls` entry from it doesn't mean the data is unusable; recovering it client-side turns a hard crash (and a wasted ~2 minutes across 3 slow failed retries, per the observed logs) into a normal successful loop iteration. `temperature=0` is Groq's own documented recommendation for reliable tool use and reduces (without eliminating) how often the raw text comes out malformed in the first place.
+### 5. `finalize` as a control tool, not a special API response
 
-## 9. Input guardrail (pre-planner scope check) with a separate, smaller model
-- **Decision:** a dedicated input guardrail (`app/agent/guardrail.py`) runs once per request, in `loop_controller.run()` immediately after the user entry is appended and *before* the planner loop begins. It makes one LLM call (through the existing `call_llm` choke point) with a `classify_scope` function-calling tool, and returns `GuardrailDecision(allowed, message)`. If out of scope, the loop controller short-circuits: it appends the refusal as the assistant answer and returns it, never entering the planner loop. The judge runs on a **separate, smaller model** — `GUARDRAIL_MODEL` (default `llama-3.1-8b-instant`), distinct from the planner's `LLM_MODEL` (`llama-3.3-70b-versatile`) — and can be disabled entirely with `GUARDRAIL_ENABLED=false`. It logs a distinct `guardrail_check` event (allowed + model only, never the message text) and **fails open** (allows the request through) if the judge call itself errors.
-- **Why a different (smaller) model — the key point:**
-  - **Latency/cost is the primary constraint on this system** (see decisions #2, #5), and the guardrail adds a full LLM round-trip to *every* request, including the many that are legitimately in scope and gain nothing from it. Running that extra call on the 70B planner model would tax every request with the cost of the largest model purely to reject the rare off-topic one.
-  - **Scope classification is a far easier task than planning + tool-calling.** Deciding "is this about real-estate/campaign data, yes/no" is a binary classification an 8B model handles reliably; it does not need the 70B model's tool-orchestration/reasoning capacity. Matching model size to task difficulty is the standard right-sizing move.
-  - `llama-3.1-8b-instant` is ~10× cheaper per token than the planner model (see `PRICING`) and materially lower latency, so the guardrail's overhead on the common in-scope path stays small and predictable.
-- **Alternatives considered:**
-  - Putting the check in `AgentController` alongside the regex PII scan — rejected: the doc deliberately keeps the controller layer deterministic and LLM-free (§0), and the controller has no loaded session context, so a follow-up like "and in Cairo?" would be judged without the prior turn and wrongly rejected. The loop controller has the context and sits inside the try/finally, so a refusal is still persisted and version-guarded.
-  - Reusing the planner model (`LLM_MODEL`) for the judge — rejected for the latency/cost reasons above; there is no accuracy benefit that justifies it for a binary scope decision.
-  - Folding the scope check into the planner's first decision (no separate call) — rejected here in favour of an explicit, independently testable, distinctly logged gate that short-circuits before any planner loop iteration is spent; the separate small-model call is the deliberate latency/cost trade for that separation.
-  - Only hardening the system prompt to refuse off-topic requests — kept as a complementary layer but insufficient alone: it relies on the planner's compliance and isn't independently auditable or logged.
-  - Failing closed on a guardrail LLM error — rejected: a transient classifier error must not block legitimate users, and the planner is itself scope-constrained, so fail-open degrades gracefully to the pre-existing behaviour.
+**Decision:** The agent signals task completion by calling a `finalize` tool (with the answer as its argument) rather than by returning a specially-shaped message or a separate API field.
 
-## 10. Multiple Groq API keys with round-robin rotation on rate-limit errors
-- **Decision:** `Settings` (`config/settings.py`) now accepts a list of additional Groq keys via `GROQ_API_KEYS` (JSON array in env, e.g. `GROQ_API_KEYS=["key2","key3"]`) alongside the existing `GROQ_API_KEY`. The `all_groq_keys` property returns a deduplicated, ordered list (primary key first). `GroqClient` (`app/agent/llm_factory.py`) holds this pool and, on `groq.RateLimitError` (rate-limit or quota-exceeded), rotates to the next key round-robin and retries immediately — cycling through every key at most once before re-raising. A `WARNING` log records each rotation.
-- **Alternatives considered:**
-  - A single `GROQ_API_KEY` with `call_llm`'s existing backoff retry — rejected: backoff retries the same exhausted key, burning time without any chance of success until the quota window resets.
-  - Rotating inside `call_llm` rather than inside `GroqClient` — rejected: `call_llm` is provider-agnostic and should not know about Groq-specific error types; the rotation belongs in the provider client where the SDK exception is already caught.
-  - Random shuffle instead of round-robin — rejected: round-robin distributes load evenly and is deterministic, making log traces easier to follow.
-- **Rationale:** quota exhaustion on a single key is the most common production failure mode for free/low-tier Groq accounts. Rotating across a pool of keys converts a hard failure (and a wasted `_MAX_ATTEMPTS`-round retry loop) into a transparent continuation of the current loop iteration, with zero changes to callers.
+- Treating `finalize` as a tool keeps the agent loop uniform — every iteration is "call a tool or finalize"; there is no special-case branch for "the model decided it's done."
+- The LLM's final answer is validated by `FinalizeInput` (Pydantic, `min_length=1`) before the loop exits, preventing empty or malformed answers from reaching the user.
+- The loop controller can enforce a hard iteration cap and call `forced_finalize` / `graceful_fallback` when the cap is hit, without changing the tool interface.
 
-## 12. SQLite over direct Excel file operations
+### 6. Agent controller separated from the HTTP layer
 
-- **Decision:** all persistent data (listings, campaigns, chat sessions) is stored in a SQLite database (`db/app.db`) accessed exclusively through the repository layer. Excel files are used only as a one-time seed source (`db/seed_database.py`); no tool or repository ever reads from or writes to an `.xlsx` file at runtime.
-- **Alternatives considered:**
-  - Reading and writing `.xlsx` files directly via `openpyxl`/`pandas` for every tool call — rejected for the reasons below.
-- **Rationale:**
-  - **Atomic operations and system reliability.** Every write in the repository (`insert`, `update`, `delete`) is wrapped in an explicit `conn.commit()` on success and `conn.rollback()` on any exception (see `app/repositories/real_estate_repository.py` and the campaign/session equivalents). SQLite's WAL journal guarantees that a crash mid-write leaves the database in its last committed state — no partial row, no corrupted file. An Excel write has no such guarantee: a crash mid-save can corrupt the entire workbook.
-  - **Resource efficiency per operation.** SQLite touches only the pages that contain the affected rows. An Excel library must deserialise the entire workbook into memory, apply the change, and serialise the whole file back to disk — even for a single-cell update. For a dataset that grows with every agent loop iteration, that per-operation cost compounds quickly.
-  - **Speed.** SQLite executes indexed point lookups and single-row writes in microseconds. An equivalent Excel round-trip (parse → mutate → serialise) takes tens to hundreds of milliseconds regardless of how small the change is, adding measurable latency to every tool call inside the agent loop.
-  - **Concurrent-access safety.** SQLite's busy-timeout (`settings.tool_timeout_seconds`, decision #4) serialises concurrent writers cleanly. `openpyxl` has no locking primitive; two simultaneous writes to the same `.xlsx` file produce silent data loss or a corrupt archive.
+**Decision:** `AgentController.handle_message()` is a plain Python function that returns a `dict` with an embedded `status` key; the FastAPI route layer translates that dict into an HTTP response.
 
-## 11. LLM failure does not trigger a replan — it falls back gracefully
-- **Decision:** `LLMCallError` (raised by `call_llm` after all retry attempts and all key rotations are exhausted) propagates unchanged out of `planner.plan()` and is caught by the `except Exception` handler in `loop_controller.run()`, which calls `graceful_fallback()` and returns a user-facing apology. The loop does **not** attempt to replan, retry the planner, or inject a recovery message into context.
-- **Alternatives considered:**
-  - Catching `LLMCallError` in the loop and retrying `planner.plan()` — rejected: if every key is exhausted and all SDK retries are spent, another planner call will fail identically; it wastes time and burns any remaining quota on other keys.
-  - Injecting a synthetic "LLM failed, please try a different approach" tool-result entry and continuing the loop — rejected: the loop budget (`max_loop_iterations`) is already tight; spending an iteration on a recovery message that the (still-broken) LLM must then interpret adds latency with no realistic chance of success.
-  - Surfacing the raw SDK error to the user — rejected: provider error messages contain internal details (model names, rate-limit headers) that are not meaningful to end users and may expose operational information.
-- **Rationale:** `graceful_fallback` already exists for unhandled exceptions and produces a clean, user-friendly message. Reusing it for LLM failures keeps the error path uniform, avoids wasted iterations, and ensures the session is always persisted (the `finally` block in `loop_controller.run()` always runs). The key-rotation in decision #10 means a true exhaustion of all keys is rare; when it does happen, a fast, honest fallback is strictly better than a slow, doomed retry.
+- The controller is fully unit-testable without spinning up an HTTP server or mocking FastAPI internals.
+- HTTP concerns (status codes, response models, exception handling) are confined to `routes/api.py`; business logic concerns (validation, PII scan, loop invocation) are confined to the controller.
+- The same controller can be called from tests, CLI scripts, or a future WebSocket handler without any HTTP dependency.
+
+### 7. PII / secret scanning at the controller boundary, before the agent loop
+
+**Decision:** Every incoming message is scanned for PII and secrets (`scan_for_sensitive_data` in `app/utilities/security.py`) in the controller, before the agent loop or any tool ever runs. A match returns HTTP 400 with a generic error; the matched value is never logged.
+
+- Blocking at the earliest possible point means sensitive data never enters the LLM context, the tool call chain, or the database.
+- The scanner returns only the pattern type (`"api_key"`, `"email"`, etc.), never the matched value, so a logging bug or accidental re-raise cannot leak the secret.
+- Centralising the check in the controller means tools and repositories never need to re-implement it.
+
+### 8. Chat session context persisted in SQLite
+
+**Decision:** Conversation history (the context list) is stored as a JSON-serialised column in the `chat_sessions` SQLite table, not in memory or a separate cache.
+
+- Persistence means sessions survive backend restarts and container redeploys without any external cache service.
+- A single SQLite volume (`db_data`) holds both domain data and session state, keeping the infrastructure footprint minimal.
+- The context is deserialised on read and re-serialised on write; for the expected session sizes this is fast enough and avoids the complexity of a separate key-value store.
+
+### 9. Rate limiting with slowapi at the ASGI middleware layer
+
+**Decision:** Per-IP rate limiting is applied via `slowapi` middleware on the FastAPI app, not at the nginx or Traefik layer.
+
+- Application-level rate limiting lets the limit be expressed in Python alongside the rest of the config and tested in unit/integration tests without a running proxy.
+- `slowapi` integrates directly with FastAPI's exception handler system, so rate-limit errors return a consistent JSON error response matching the rest of the API.
+- Traefik/nginx can add a second layer of protection at the edge if needed, but the application layer is the authoritative enforcer.
+
+### 10. Deploy on Dokploy as a single Docker Compose stack behind Traefik + nginx
+
+**Decision:** The full stack (FastAPI backend + React frontend) is deployed as one Docker Compose project on a single VPS via [Dokploy](https://dokploy.com), with two proxy layers: Traefik (Dokploy's built-in edge proxy) in front, and nginx (inside the frontend container) as the internal `/api/` reverse proxy.
+
+- A single Compose project means one `docker compose up` / one Dokploy redeploy covers the entire stack — no separate CI pipelines or orchestration needed for a project of this scale.
+- Dokploy ships Traefik pre-configured; it handles TLS termination (Let's Encrypt), HTTP→HTTPS redirect, and domain routing without any manual certificate management.
+- The backend container is never exposed to the internet. nginx inside the frontend container proxies `/api/*` to `backend:8000` on the internal Compose network, so the attack surface is limited to a single public port (443 via Traefik).
+- nginx also serves the React SPA with correct `try_files` fallback for client-side routing — combining static file serving and API proxying in one container avoids a third service.
+- See `docs/DEPLOYMENT.md` for the full traffic diagram and step-by-step setup.
+
+> There are many more deployment-related decisions captured in `docs/DEPLOYMENT.md` (volume strategy, env-var management, DNS setup, update flow). This entry records only the top-level architectural choice.
+
+### 11. React + Vite over Gradio for the frontend
+
+**Decision:** The user-facing UI is built with React (Vite + Tailwind + lucide-react) rather than Gradio, even though both consume the same FastAPI backend.
+
+- Both options talk to the same FastAPI API, so the backend is identical either way — the choice is purely about the UI layer.
+- Gradio is optimised for rapid ML demos with a fixed component palette; it provides little control over layout, interaction patterns, or visual design beyond its built-in widgets.
+- React gives full control over component composition, state management, and styling, enabling a purpose-built UX (custom chat layout, file upload flow, table rendering, loading states) that would be impossible or very awkward to achieve in Gradio.
+- Vite's dev server with HMR keeps the frontend iteration loop fast; the production build is a static asset bundle that nginx serves with zero runtime overhead.
+- Tailwind + lucide-react keeps the dependency footprint small while still producing a polished, accessible UI.
+- The trade-off is more boilerplate than Gradio for a pure demo, but for a production-quality tool the flexibility and UX ceiling of React far outweigh the setup cost.
+
+### 12. LLM provider factory + multiple Groq API keys with round-robin rotation
+**Decision:** All LLM access goes through an `LLMProviderClient` abstract base and `get_llm_client()` registry (`llm_factory.py`); `GroqClient` holds a key pool (`GROQ_API_KEY` + `GROQ_API_KEYS`) and rotates round-robin on `RateLimitError`, cycling every key at most once before re-raising.
+- The factory/registry keeps every call site provider-agnostic — callers only ever see `LLMResponse`/`LLMCallError`, never a provider SDK type; adding a second provider is a new subclass and one registry entry, not a change to any existing call site.
+- Provider-specific key vars (`GROQ_API_KEY`, etc.) allow multiple providers to be configured side by side without one overwriting another.
+- Rotating across a key pool on rate-limit converts a hard quota-exhaustion failure (and a wasted multi-attempt retry loop) into a transparent continuation of the current loop iteration with zero changes to callers.
+- Round-robin distribution is deterministic and even, making log traces easier to follow than a random shuffle; each rotation is logged at `WARNING` level for observability.
+- Backoff-retrying the same exhausted key (the alternative) burns time without any chance of success until the quota window resets.

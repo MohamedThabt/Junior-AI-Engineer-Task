@@ -31,14 +31,71 @@
 ## 📐 Architecture at a glance
 
 ```mermaid
-flowchart LR
-    UI[React + Vite UI] -->|HTTP/JSON| API[FastAPI API]
-    API --> Guard[Validation, PII scan, rate limiting]
-    Guard --> Agent[Planner → executor → tools]
-    Agent <-->|tool calls| LLM[Groq LLM]
-    Agent --> Repositories[SQLite repositories]
-    Repositories --> DB[(SQLite database)]
-    Excel[Excel workbooks] -->|seed| DB
+flowchart TD
+    UI["React + Vite<br/>Chat interface"] -->|HTTP / JSON| API
+
+    subgraph Frontend["Frontend"]
+        UI
+    end
+
+    subgraph Backend["FastAPI backend"]
+        API["/api routes<br/>CORS · rate limiting · request logging"]
+        Validate["Agent controller<br/>message validation + PII/secret scan"]
+        Reject["400 rejection<br/>security event logged"]
+        Guardrail["Input guardrail<br/>scope classification"]
+        Sessions["Session controller<br/>CRUD"]
+        Loop["ReAct loop controller<br/>load + persist session context"]
+        Memory["Memory shaping<br/>window · summarize · compact"]
+        Planner["Planner<br/>tool-call decision"]
+        Executor["Executor / dispatcher<br/>validate + invoke"]
+        Tools["Typed tool registry<br/>real estate · campaigns · finalize"]
+        Repositories["Repository layer<br/>SQL + retry logic"]
+
+        API --> Validate
+        API --> Sessions
+        Validate -->|sensitive data| Reject
+        Validate -->|clean input| Loop
+        Loop --> Guardrail
+        Guardrail -->|in scope / fail open| Memory
+        Guardrail -->|out of scope| Loop
+        Memory --> Planner
+        Planner -->|tool call| Executor
+        Executor --> Tools
+        Tools --> Repositories
+        Repositories --> Loop
+        Planner -->|finalize| Loop
+        Sessions --> Repositories
+    end
+
+    subgraph AI["LLM provider"]
+        Groq["Groq API<br/>planner + guardrail models"]
+    end
+
+    subgraph Storage["Persistent storage"]
+        DB[("SQLite<br/>listings · campaigns · chat sessions")]
+        Excel["Excel workbooks<br/>initial seed data"]
+    end
+
+    Guardrail <-->|scope check| Groq
+    Planner <-->|tool schemas + context| Groq
+    Repositories <--> DB
+    Excel -->|seed script| DB
+
+    classDef frontend fill:#0f172a,stroke:#38bdf8,color:#e0f2fe,stroke-width:2px;
+    classDef api fill:#172554,stroke:#60a5fa,color:#dbeafe,stroke-width:2px;
+    classDef safety fill:#451a03,stroke:#f59e0b,color:#fef3c7,stroke-width:2px;
+    classDef agent fill:#3b0764,stroke:#c084fc,color:#f3e8ff,stroke-width:2px;
+    classDef data fill:#064e3b,stroke:#34d399,color:#d1fae5,stroke-width:2px;
+    classDef external fill:#4c1d95,stroke:#a78bfa,color:#f5f3ff,stroke-width:2px;
+    classDef error fill:#7f1d1d,stroke:#f87171,color:#fee2e2,stroke-width:2px;
+
+    class UI frontend;
+    class API,Sessions api;
+    class Validate,Guardrail safety;
+    class Loop,Memory,Planner,Executor,Tools agent;
+    class Repositories,DB,Excel data;
+    class Groq external;
+    class Reject error;
 ```
 
 > [!IMPORTANT]
